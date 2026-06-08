@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EAPCET CSE Allotment Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1018;
+    --surface: #221620;
+    --surface2: #2e1d2a;
+    --border: #3d2438;
+    --accent: #e8609a;
+    --accent2: #c084c0;
+    --accent3: #f0a0c0;
+    --accent4: #f59e0b;
+    --accent5: #ef4444;
+    --text: #f5eef5;
+    --text2: #c4a0b8;
+    --text3: #8a6880;
+    --glow: rgba(232,96,154,0.15);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ANIMATED BG */
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(232,96,154,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,96,154,0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+  }
+  .bg-orb1 {
+    position: fixed; width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(232,96,154,0.14) 0%, transparent 70%);
+    top: -200px; left: -200px; pointer-events: none; z-index: 0;
+  }
+  .bg-orb2 {
+    position: fixed; width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(192,132,192,0.12) 0%, transparent 70%);
+    bottom: -150px; right: -150px; pointer-events: none; z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* HEADER */
+  .header {
+    text-align: center;
+    padding: 40px 20px 32px;
+    margin-bottom: 32px;
+  }
+  .header .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3);
+    color: #60a5fa; padding: 6px 16px; border-radius: 100px;
+    font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 16px;
+  }
+  .header h1 {
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 0%, #60a5fa 50%, #818cf8 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  .header p {
+    color: var(--text2); font-size: 16px; max-width: 600px; margin: 0 auto;
+  }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .stat-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .stat-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, var(--glow) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .stat-card .label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-card .sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+  /* TABS */
+  .tabs {
+    display: flex; gap: 4px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 14px; padding: 6px;
+    margin-bottom: 24px; width: fit-content;
+  }
+  .tab {
+    padding: 10px 20px; border-radius: 10px; border: none;
+    background: transparent; color: var(--text2);
+    font-size: 14px; font-weight: 500; font-family: inherit;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .tab.active {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #fff; box-shadow: 0 4px 16px rgba(59,130,246,0.3);
+  }
+  .tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* FILTER ROW */
+  .filter-row {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; min-width: 160px; flex: 1; }
+  .filter-group label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .filter-group select,
+  .filter-group input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 14px; border-radius: 10px;
+    font-size: 14px; font-family: inherit; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+  .filter-group select:focus,
+  .filter-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+  .filter-group select option { background: var(--surface); }
+  .btn {
+    padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; font-family: inherit;
+    transition: all 0.2s; white-space: nowrap; align-self: flex-end;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,0.4); }
+  .btn-ghost {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text2);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+
+  /* RESULTS COUNT */
+  .results-info {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+  }
+  .results-info .count {
+    font-size: 13px; color: var(--text2);
+  }
+  .results-info .count span { color: var(--accent); font-weight: 600; }
+
+  /* TABLE */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+  }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: var(--surface2); padding: 14px 16px;
+    text-align: left; font-size: 11px; font-weight: 700;
+    color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+    cursor: pointer; user-select: none; transition: color 0.2s;
+  }
+  thead th:hover { color: var(--accent); }
+  thead th .sort-icon { margin-left: 4px; opacity: 0.4; }
+  thead th.sort-asc .sort-icon::after { content: ' ↑'; opacity: 1; color: var(--accent); }
+  thead th.sort-desc .sort-icon::after { content: ' ↓'; opacity: 1; color: var(--accent); }
+  tbody tr {
+    border-bottom: 1px solid rgba(30,45,69,0.6);
+    transition: background 0.15s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(59,130,246,0.04); }
+  tbody td { padding: 13px 16px; color: var(--text); vertical-align: middle; }
+  tbody td.college-name { font-weight: 500; max-width: 280px; }
+  tbody td.college-code {
+    font-family: monospace; font-size: 12px;
+    color: var(--accent); background: rgba(59,130,246,0.08);
+    border-radius: 6px; padding: 4px 8px; width: fit-content;
+    white-space: nowrap;
+  }
+  .rank-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 8px;
+    font-weight: 600; font-size: 13px;
+  }
+  .rank-open { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+  .rank-close { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+  .rank-match { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
+  .students-pill {
+    background: var(--surface2); color: var(--text2);
+    border-radius: 100px; padding: 3px 10px; font-size: 12px; font-weight: 500;
+    display: inline-block;
+  }
+
+  /* YEAR BADGE */
+  .year-tag {
+    display: inline-block; padding: 3px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    background: rgba(99,102,241,0.12); color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,0.25);
+  }
+
+  /* RANK FINDER SPECIAL */
+  .rank-input-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 28px; margin-bottom: 24px;
+    position: relative; overflow: hidden;
+  }
+  .rank-input-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(99,102,241,0.04) 100%);
+    pointer-events: none;
+  }
+  .rank-input-card h3 {
+    font-size: 18px; font-weight: 700; margin-bottom: 4px;
+    color: var(--text);
+  }
+  .rank-input-card p { color: var(--text2); font-size: 13px; margin-bottom: 20px; }
+  .rank-input-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .rank-big-input {
+    background: var(--surface2); border: 2px solid var(--border);
+    color: var(--text); padding: 14px 20px; border-radius: 14px;
+    font-size: 28px; font-weight: 700; font-family: inherit; outline: none;
+    width: 220px; text-align: center; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .rank-big-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.2);
+  }
+  .match-indicator {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 20px; background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.2); border-radius: 14px;
+    font-size: 14px; font-weight: 500; color: #34d399;
+  }
+  .match-indicator .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #10b981; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.6;transform:scale(1.3);} }
+
+  /* CHART AREA */
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; margin-bottom: 20px;
+  }
+  .chart-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: var(--text); }
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 12px; }
+  .bar-label { font-size: 11px; color: var(--text2); white-space: nowrap; width: 120px; text-align: right; }
+  .bar-track { flex: 1; height: 28px; background: var(--surface2); border-radius: 6px; overflow: hidden; position: relative; }
+  .bar-fill {
+    height: 100%; border-radius: 6px; display: flex; align-items: center;
+    padding-left: 8px; font-size: 11px; font-weight: 600; color: #fff;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--text3);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 16px; color: var(--text2); margin-bottom: 6px; }
+  .empty-state p { font-size: 13px; }
+
+  /* PAGINATION */
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; }
+  .page-btn {
+    padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text2); cursor: pointer;
+    font-size: 13px; font-family: inherit; transition: all 0.2s;
+  }
+  .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .page-btn:hover:not(.active):not(:disabled) { border-color: var(--accent); color: var(--text); }
+  .page-btn:disabled { opacity: 0.3; cursor: default; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+  @media(max-width:640px){
+    .filter-row { flex-direction: column; }
+    .filter-group { min-width: 100%; }
+    .rank-big-input { width: 160px; font-size: 22px; }
+    .tabs { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-orb1"></div>
+<div class="bg-orb2"></div>
+
+<div class="container">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="badge">📊 EAPCET CSE Allotment Intelligence</div>
+    <h1>College Allotment Dashboard</h1>
+    <p>Explore year-wise opening &amp; closing ranks for CSE across all Telangana engineering colleges (2015 – 2025)</p>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card">
+      <div class="label">Total Records</div>
+      <div class="value" id="stat-total">–</div>
+      <div class="sub">Student allotments</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Year / Phases</div>
+      <div class="value" id="stat-years">–</div>
+      <div class="sub">2015 – 2025</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Colleges</div>
+      <div class="value" id="stat-colleges">–</div>
+      <div class="sub">Across Telangana</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Best Opening Rank</div>
+      <div class="value" id="stat-best">–</div>
+      <div class="sub">In current view</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('explore')" id="tab-explore">🔍 Explore Data</button>
+    <button class="tab" onclick="switchTab('finder')" id="tab-finder">🎯 Rank Finder</button>
+    <button class="tab" onclick="switchTab('trends')" id="tab-trends">📈 Year Trends</button>
+  </div>
+
+  <!-- PANEL: EXPLORE DATA -->
+  <div class="panel active" id="panel-explore">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Year / Phase</label>
+        <select id="filterYear" onchange="applyFilters()">
+          <option value="">All Years & Phases</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>College</label>
+        <select id="filterCollege" onchange="applyFilters()">
+          <option value="">All Colleges</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Search College Name</label>
+        <input type="text" id="filterSearch" placeholder="Type college name..." oninput="applyFilters()">
+      </div>
+      <div class="filter-group">
+        <label>Sort By</label>
+        <select id="filterSort" onchange="applyFilters()">
+          <option value="opening_rank">Opening Rank (Best First)</option>
+          <option value="closing_rank">Closing Rank</option>
+          <option value="college_name">College Name</option>
+          <option value="total_students">Total Students</option>
+          <option value="year">Year</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
+    </div>
+
+    <div class="results-info">
+      <div class="count">Showing <span id="resultCount">0</span> results</div>
+      <div id="paginationTop"></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table id="exploreTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Year / Phase</th>
+              <th>Code</th>
+              <th>College Name</th>
+              <th>Opening Rank</th>
+              <th>Closing Rank</th>
+              <th>Students</th>
+            </tr>
+          </thead>
+          <tbody id="exploreBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="paginationBottom"></div>
+    </div>
+
+    <!-- STUDENT SECTION (shows when year + college both selected) -->
+    <div id="studentSection" style="display:none;margin-top:32px;">
+      <!-- Section Header -->
+      <div class="section-header">
+        <div class="section-header-left">
+          <div class="section-icon">👥</div>
+          <div>
+            <h2 id="secTitle" class="section-title"></h2>
+            <p id="secSubtitle" class="section-subtitle"></p>
+          </div>
+        </div>
+        <div class="section-header-right" id="secStatsPills"></div>
+      </div>
+
+      <!-- Stats Cards -->
+      <div id="secStatsCards" class="sec-stats-grid"></div>
+
+      <!-- Category Breakdown -->
+      <div id="secCategories" class="sec-categories"></div>
+
+      <!-- Search -->
+      <div class="sec-search-row">
+        <div style="position:relative;flex:1;max-width:480px;">
+          <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
+          <input type="text" id="studentSearch"
+            placeholder="Search by name, roll no, category, region…"
+            oninput="filterStudents()"
+            style="width:100%;padding:11px 14px 11px 42px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        </div>
+        <div id="secSearchCount" style="font-size:13px;color:var(--text3);"></div>
+      </div>
+
+      <!-- Student Table -->
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr>
+                <th class="sec-th">#</th>
+                <th class="sec-th">Rank</th>
+                <th class="sec-th">Candidate Name</th>
+                <th class="sec-th">Roll No</th>
+                <th class="sec-th">Gender</th>
+                <th class="sec-th">Region</th>
+                <th class="sec-th">Category</th>
+                <th class="sec-th">Seat Type</th>
+              </tr>
+            </thead>
+            <tbody id="studentBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="studentPagination" style="padding:14px 16px;"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PANEL: RANK FINDER -->
+  <div class="panel" id="panel-finder">
+    <div class="rank-input-card">
+      <h3>🎯 Find Colleges for Your Rank</h3>
+      <p>Enter your EAPCET rank to see which colleges you qualify for across selected year and phase</p>
+      <div class="rank-input-row">
+        <div>
+          <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;display:block;margin-bottom:6px;">Your Rank</label>
+          <input type="number" class="rank-big-input" id="myRank" placeholder="e.g. 25000" min="1" max="300000" oninput="findColleges()">
+        </div>
+        <div class="filter-group" style="max-width:200px;">
+          <label>Year / Phase</label>
+          <select id="finderYear" onchange="findColleges()">
+            <option value="">All Years</option>
+          </select>
+        </div>
+        <div class="filter-group" style="max-width:200px;">
+          <label>Max Opening Rank Buffer</label>
+          <select id="finderBuffer" onchange="findColleges()">
+            <option value="0">Exact (≤ Closing Rank)</option>
+            <option value="5000" selected>±5,000 rank buffer</option>
+            <option value="10000">±10,000 rank buffer</option>
+            <option value="20000">±20,000 rank buffer</option>
+          </select>
+        </div>
+        <div class="match-indicator" id="matchIndicator" style="display:none;">
+          <div class="dot"></div>
+          <span id="matchCount">0 colleges found</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table id="finderTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Year / Phase</th>
+              <th>Code</th>
+              <th>College Name</th>
+              <th>Opening Rank</th>
+              <th>Closing Rank</th>
+              <th>Your Rank</th>
+              <th>Students</th>
+            </tr>
+          </thead>
+          <tbody id="finderBody">
+            <tr><td colspan="8">
+              <div class="empty-state">
+                <div class="icon">🎯</div>
+                <h3>Enter your rank above</h3>
+                <p>We'll show colleges where you could potentially qualify</p>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL: YEAR TRENDS -->
+  <div class="panel" id="panel-trends">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Select College</label>
+        <select id="trendsCollege" onchange="renderTrends()">
+          <option value="">Select a college to see trends...</option>
+        </select>
+      </div>
+    </div>
+    <div id="trendsContent">
+      <div class="empty-state">
+        <div class="icon">📈</div>
+        <h3>Select a college</h3>
+        <p>Choose a college to view its rank trend across years</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let allData = [];
+let years = [];
+let colleges = [];
+let currentPage = 1;
+const PAGE_SIZE = 50;
+let filteredData = [];
+
+// Load data
+fetch('dashboard_data.json')
+  .then(r => r.json())
+  .then(json => {
+    allData = json.data;
+    years = json.years;
+    colleges = json.colleges;
+    init();
+  })
+  .catch(e => {
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#f87171;">
+      <div style="font-size:48px;">⚠️</div>
+      <h2>Could not load dashboard_data.json</h2>
+      <p style="color:#94a3b8;">Make sure dashboard_data.json is in the same folder as this HTML file.</p>
+      <code style="background:#1a2236;padding:8px 16px;border-radius:8px;color:#60a5fa;">node preprocess.js</code>
+    </div>`;
+  });
+
+function init() {
+  // Stats
+  const totalStudents = allData.reduce((s, r) => s + r.total_students, 0);
+  document.getElementById('stat-total').textContent = totalStudents.toLocaleString();
+  document.getElementById('stat-years').textContent = years.length;
+  document.getElementById('stat-colleges').textContent = colleges.length;
+
+  // Populate selects
+  const yearSels = [document.getElementById('filterYear'), document.getElementById('finderYear')];
+  yearSels.forEach(sel => {
+    years.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = formatYear(y);
+      sel.appendChild(opt);
+    });
+  });
+
+  const collegeSel = document.getElementById('filterCollege');
+  const trendsSel = document.getElementById('trendsCollege');
+  colleges.forEach(c => {
+    [collegeSel, trendsSel].forEach(sel => {
+      const opt = document.createElement('option');
+      opt.value = c.code;
+      opt.textContent = `${c.code} – ${c.name}`;
+      sel.appendChild(opt);
+    });
+  });
+
+  applyFilters();
+}
+
+function formatYear(y) {
+  if (y === '2025_1_PHASE') return '2025 – Phase 1';
+  if (y === '2025_2_PHASE') return '2025 – Phase 2';
+  if (y === '2025_FINAL_PHASE') return '2025 – Final Phase';
+  if (y === '2025_MOCK_PHASE') return '2025 – Mock Phase';
+  return y;
+}
+
+function applyFilters() {
+  const year    = document.getElementById('filterYear').value;
+  const college = document.getElementById('filterCollege').value;
+  const search  = document.getElementById('filterSearch').value.toLowerCase().trim();
+  const sortBy  = document.getElementById('filterSort').value;
+
+  filteredData = allData.filter(r => {
+    if (year    && r.year         !== year)    return false;
+    if (college && r.college_code !== college) return false;
+    if (search  && !r.college_name.toLowerCase().includes(search) && !r.college_code.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  filteredData.sort((a, b) => {
+    if (sortBy === 'opening_rank')  return a.opening_rank - b.opening_rank;
+    if (sortBy === 'closing_rank')  return a.closing_rank - b.closing_rank;
+    if (sortBy === 'college_name')  return a.college_name.localeCompare(b.college_name);
+    if (sortBy === 'total_students')return b.total_students - a.total_students;
+    if (sortBy === 'year')          return a.year.localeCompare(b.year) || a.college_name.localeCompare(b.college_name);
+    return 0;
+  });
+
+  const best = filteredData.length ? Math.min(...filteredData.map(r => r.opening_rank)) : '–';
+  document.getElementById('stat-best').textContent = best === '–' ? '–' : best.toLocaleString();
+  document.getElementById('resultCount').textContent = filteredData.length.toLocaleString();
+
+  currentPage = 1;
+  renderTable();
+  renderPagination();
+
+  // Auto-load student section when both year + college are selected
+  if (year && college) {
+    const row = allData.find(r => r.year === year && r.college_code === college);
+    const collegeName = row ? row.college_name : college;
+    loadStudentSection(year, college, collegeName);
+  } else {
+    document.getElementById('studentSection').style.display = 'none';
+  }
+}
+
+function renderTable() {
+  const tbody = document.getElementById('exploreBody');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const slice = filteredData.slice(start, start + PAGE_SIZE);
+
+  if (slice.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="empty-state"><div class="icon">🔍</div><h3>No results found</h3><p>Try adjusting your filters</p></div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = slice.map((r, i) => `
+    <tr>
+      <td style="color:var(--text3);font-size:12px;">${start + i + 1}</td>
+      <td><span class="year-tag">${formatYear(r.year)}</span></td>
+      <td><span class="college-code">${r.college_code}</span></td>
+      <td class="college-name" title="${r.college_name}">${truncate(r.college_name, 55)}</td>
+      <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
+      <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
+      <td><span class="students-pill">${r.total_students}</span></td>
+    </tr>
+  `).join('');
+}
+
+function renderPagination() {
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+  const paginationHTML = () => {
+    if (totalPages <= 1) return '';
+    let html = `<button class="page-btn" ${currentPage===1?'disabled':''} onclick="goPage(${currentPage-1})">← Prev</button>`;
+    const pages = getPageNums(currentPage, totalPages);
+    pages.forEach(p => {
+      if (p === '...') html += `<span style="color:var(--text3);padding:0 4px;">…</span>`;
+      else html += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+    });
+    html += `<button class="page-btn" ${currentPage===totalPages?'disabled':''} onclick="goPage(${currentPage+1})">Next →</button>`;
+    return html;
+  };
+  document.getElementById('paginationBottom').innerHTML = paginationHTML();
+  document.getElementById('paginationTop').innerHTML = paginationHTML();
+}
+
+function getPageNums(cur, total) {
+  if (total <= 7) return Array.from({length: total}, (_, i) => i + 1);
+  if (cur <= 4) return [1,2,3,4,5,'...',total];
+  if (cur >= total - 3) return [1,'...',total-4,total-3,total-2,total-1,total];
+  return [1,'...',cur-1,cur,cur+1,'...',total];
+}
+
+function goPage(p) {
+  currentPage = p;
+  renderTable();
+  renderPagination();
+  document.getElementById('panel-explore').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetFilters() {
+  document.getElementById('filterYear').value = '';
+  document.getElementById('filterCollege').value = '';
+  document.getElementById('filterSearch').value = '';
+  document.getElementById('filterSort').value = 'opening_rank';
+  applyFilters();
+}
+
+function findColleges() {
+  const rankVal = parseInt(document.getElementById('myRank').value, 10);
+  const year = document.getElementById('finderYear').value;
+  const buffer = parseInt(document.getElementById('finderBuffer').value, 10) || 0;
+  const tbody = document.getElementById('finderBody');
+  const indicator = document.getElementById('matchIndicator');
+
+  if (!rankVal || rankVal < 1) {
+    indicator.style.display = 'none';
+    tbody.innerHTML = `<tr><td colspan="8">
+      <div class="empty-state"><div class="icon">🎯</div><h3>Enter your rank above</h3><p>We'll show colleges where you could potentially qualify</p></div>
+    </td></tr>`;
+    return;
+  }
+
+  let matched = allData.filter(r => {
+    if (year && r.year !== year) return false;
+    // Qualify if rank <= closing_rank + buffer
+    return rankVal <= (r.closing_rank + buffer);
+  });
+
+  matched.sort((a, b) => a.opening_rank - b.opening_rank);
+
+  indicator.style.display = 'flex';
+  document.getElementById('matchCount').textContent = `${matched.length} colleges found`;
+
+  if (matched.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8">
+      <div class="empty-state"><div class="icon">😔</div><h3>No colleges found</h3><p>Try increasing the rank buffer or selecting a different year</p></div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = matched.map((r, i) => {
+    const inRange = rankVal >= r.opening_rank && rankVal <= r.closing_rank;
+    const aboveOpen = rankVal < r.opening_rank;
+    let statusBadge, rowStyle = '';
+    if (aboveOpen) {
+      statusBadge = `<span class="rank-badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">⭐ Strong Chance</span>`;
+      rowStyle = 'background:rgba(16,185,129,0.03);';
+    } else if (inRange) {
+      statusBadge = `<span class="rank-badge rank-match">✅ In Range</span>`;
+      rowStyle = 'background:rgba(245,158,11,0.03);';
+    } else {
+      statusBadge = `<span class="rank-badge" style="background:rgba(239,68,68,0.10);color:#f87171;border:1px solid rgba(239,68,68,0.2);">⚠️ Marginal</span>`;
+    }
+
+    return `<tr style="${rowStyle}">
+      <td style="color:var(--text3);font-size:12px;">${i+1}</td>
+      <td><span class="year-tag">${formatYear(r.year)}</span></td>
+      <td><span class="college-code">${r.college_code}</span></td>
+      <td class="college-name" title="${r.college_name}">${truncate(r.college_name, 50)}</td>
+      <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
+      <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
+      <td>${statusBadge}</td>
+      <td><span class="students-pill">${r.total_students}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTrends() {
+  const code = document.getElementById('trendsCollege').value;
+  const container = document.getElementById('trendsContent');
+  if (!code) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📈</div><h3>Select a college</h3><p>Choose a college to view its rank trend across years</p></div>`;
+    return;
+  }
+
+  const rows = allData.filter(r => r.college_code === code).sort((a, b) => a.year.localeCompare(b.year));
+  const collegeName = rows.length ? rows[0].college_name : code;
+
+  if (rows.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">😕</div><h3>No data</h3><p>No allotment data found for this college</p></div>`;
+    return;
+  }
+
+  const maxRank = Math.max(...rows.map(r => r.closing_rank));
+
+  const barsHTML = rows.map(r => {
+    const openPct = Math.max(2, (r.opening_rank / maxRank) * 100);
+    const closePct = Math.max(2, (r.closing_rank / maxRank) * 100);
+    return `
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span class="year-tag">${formatYear(r.year)}</span>
+          <span style="font-size:12px;color:var(--text3);">${r.total_students} students</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:11px;color:var(--text3);width:90px;text-align:right;">Opening</span>
+            <div style="flex:1;height:24px;background:var(--surface2);border-radius:6px;overflow:hidden;">
+              <div style="width:${openPct.toFixed(1)}%;height:100%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:6px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;">${r.opening_rank.toLocaleString()}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:11px;color:var(--text3);width:90px;text-align:right;">Closing</span>
+            <div style="flex:1;height:24px;background:var(--surface2);border-radius:6px;overflow:hidden;">
+              <div style="width:${closePct.toFixed(1)}%;height:100%;background:linear-gradient(90deg,#ef4444,#f87171);border-radius:6px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;">${r.closing_rank.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const summary = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="stat-card"><div class="label">Best Opening</div><div class="value" style="font-size:22px;">${Math.min(...rows.map(r=>r.opening_rank)).toLocaleString()}</div></div>
+      <div class="stat-card"><div class="label">Worst Closing</div><div class="value" style="font-size:22px;">${maxRank.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="label">Data Points</div><div class="value" style="font-size:22px;">${rows.length}</div></div>
+      <div class="stat-card"><div class="label">Total Students</div><div class="value" style="font-size:22px;">${rows.reduce((s,r)=>s+r.total_students,0).toLocaleString()}</div></div>
+    </div>`;
+
+  container.innerHTML = `
+    <div class="chart-card">
+      <h3>📊 Year-wise Opening &amp; Closing Ranks — ${collegeName}</h3>
+      ${summary}
+      <div class="bar-chart">${barsHTML}</div>
+    </div>`;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  document.getElementById(`tab-${tab}`).classList.add('active');
+}
+
+function truncate(str, len) {
+  return str.length > len ? str.slice(0, len) + '…' : str;
+}
+
+// ========== INLINE STUDENT SECTION ==========
+let secStudents  = [];   // all students for current college+year
+let secFiltered  = [];   // post-search
+let secPage      = 1;
+const SEC_PAGE   = 100;
+let yearCache    = {};   // loaded year JSONs
+
+async function loadStudentSection(year, code, name) {
+  const sec = document.getElementById('studentSection');
+  sec.style.display = 'block';
+
+  // Header
+  document.getElementById('secTitle').textContent = name;
+  document.getElementById('secSubtitle').textContent =
+    `${formatYear(year)}  \u00b7  CSE Branch  \u00b7  Code: ${code}`;
+  document.getElementById('secStatsCards').innerHTML =
+    '<div style="color:var(--text3);font-size:14px;padding:16px 0;">\u23F3 Loading students...</div>';
+  document.getElementById('secCategories').innerHTML = '';
+  document.getElementById('studentBody').innerHTML = '';
+  document.getElementById('studentSearch').value = '';
+  document.getElementById('studentPagination').innerHTML = '';
+
+  // Scroll into view
+  setTimeout(() => sec.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+  // Load year file (cached)
+  if (!yearCache[year]) {
+    try {
+      const res = await fetch(`students_by_year/${year}.json`);
+      yearCache[year] = await res.json();
+    } catch(e) {
+      document.getElementById('secStatsCards').innerHTML =
+        '<div style="color:#f87171;padding:16px 0;">\u26a0\ufe0f Could not load student data. Make sure the server is running.</div>';
+      return;
+    }
+  }
+
+  secStudents = yearCache[year][code] || [];
+  secFiltered = [...secStudents];
+  secPage     = 1;
+  renderSecStats();
+  renderStudentTable();
+  renderStudentPagination();
+}
+
+function renderSecStats() {
+  if (!secStudents.length) {
+    document.getElementById('secStatsCards').innerHTML =
+      '<div style="color:var(--text3);font-size:14px;padding:16px 0;">No student data found for this selection.</div>';
+    return;
+  }
+  const total  = secStudents.length;
+  const minR   = secStudents[0].rank;
+  const maxR   = secStudents[total-1].rank;
+  const female = secStudents.filter(s => s.gender === 'F').length;
+  const male   = total - female;
+
+  document.getElementById('secStatsCards').innerHTML = `
+    <div class="sec-stat-card">
+      <div class="sec-stat-val">${total.toLocaleString()}</div>
+      <div class="sec-stat-lbl">Total Students</div>
+    </div>
+    <div class="sec-stat-card" style="--card-accent:#34d399;">
+      <div class="sec-stat-val" style="color:#34d399;">${minR.toLocaleString()}</div>
+      <div class="sec-stat-lbl">Opening Rank</div>
+    </div>
+    <div class="sec-stat-card" style="--card-accent:#f87171;">
+      <div class="sec-stat-val" style="color:#f87171;">${maxR.toLocaleString()}</div>
+      <div class="sec-stat-lbl">Closing Rank</div>
+    </div>
+    <div class="sec-stat-card" style="--card-accent:#93c5fd;">
+      <div class="sec-stat-val" style="color:#93c5fd;">${male}</div>
+      <div class="sec-stat-lbl">Male (\u2642)</div>
+    </div>
+    <div class="sec-stat-card" style="--card-accent:#f0a0c0;">
+      <div class="sec-stat-val" style="color:#f0a0c0;">${female}</div>
+      <div class="sec-stat-lbl">Female (\u2640)</div>
+    </div>`;
+
+  // Category breakdown
+  const catMap = {};
+  secStudents.forEach(s => { catMap[s.category] = (catMap[s.category]||0)+1; });
+  const catHTML = Object.entries(catMap)
+    .sort((a,b) => b[1]-a[1])
+    .map(([k,v]) => `
+      <div class="cat-pill">
+        <span class="cat-name">${k}</span>
+        <span class="cat-count">${v}</span>
+      </div>`).join('');
+  document.getElementById('secCategories').innerHTML =
+    `<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">Category Breakdown</div>
+     <div style="display:flex;flex-wrap:wrap;gap:8px;">${catHTML}</div>`;
+
+  document.getElementById('secSearchCount').textContent = `${total} students`;
+}
+
+function filterStudents() {
+  const q = document.getElementById('studentSearch').value.toLowerCase().trim();
+  secFiltered = q ? secStudents.filter(s =>
+    s.name.toLowerCase().includes(q) ||
+    s.rollno.toLowerCase().includes(q) ||
+    s.category.toLowerCase().includes(q) ||
+    s.seat_cat.toLowerCase().includes(q) ||
+    s.region.toLowerCase().includes(q)
+  ) : [...secStudents];
+  secPage = 1;
+  document.getElementById('secSearchCount').textContent =
+    q ? `${secFiltered.length} of ${secStudents.length} students` : `${secStudents.length} students`;
+  renderStudentTable();
+  renderStudentPagination();
+}
+
+function renderStudentTable() {
+  const tbody = document.getElementById('studentBody');
+  const start = (secPage - 1) * SEC_PAGE;
+  const slice = secFiltered.slice(start, start + SEC_PAGE);
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text3);">
+      No students match your search</td></tr>`;
+    return;
+  }
+  const gCol = g => g === 'F' ? '#f0a0c0' : '#93c5fd';
+  tbody.innerHTML = slice.map((s, i) => `
+    <tr class="student-row">
+      <td class="std-td" style="color:var(--text3);">${start+i+1}</td>
+      <td class="std-td" style="font-weight:700;color:var(--accent);font-size:15px;">${s.rank.toLocaleString()}</td>
+      <td class="std-td" style="font-weight:600;color:var(--text);">${s.name}</td>
+      <td class="std-td" style="font-family:monospace;font-size:12px;color:var(--text2);">${s.rollno}</td>
+      <td class="std-td"><span style="color:${gCol(s.gender)};font-weight:700;">${s.gender==='F'?'\u2640 F':'\u2642 M'}</span></td>
+      <td class="std-td" style="color:var(--text2);">${s.region}</td>
+      <td class="std-td"><span class="cat-badge">${s.category}</span></td>
+      <td class="std-td" style="color:var(--text3);font-size:11px;">${s.seat_cat}</td>
+    </tr>`).join('');
+}
+
+function renderStudentPagination() {
+  const totalPages = Math.ceil(secFiltered.length / SEC_PAGE);
+  const pag = document.getElementById('studentPagination');
+  if (totalPages <= 1) {
+    pag.innerHTML = `<span style="font-size:12px;color:var(--text3);">All ${secFiltered.length} students shown</span>`;
+    return;
+  }
+  let html = `<button class="page-btn" ${secPage===1?'disabled':''} onclick="secGoPage(${secPage-1})">← Prev</button>`;
+  getPageNums(secPage, totalPages).forEach(p => {
+    if (p === '...') html += `<span style="color:var(--text3);padding:0 4px;">…</span>`;
+    else html += `<button class="page-btn ${p===secPage?'active':''}" onclick="secGoPage(${p})">${p}</button>`;
+  });
+  html += `<button class="page-btn" ${secPage===totalPages?'disabled':''} onclick="secGoPage(${secPage+1})">Next →</button>`;
+  html += `<span style="font-size:12px;color:var(--text3);margin-left:8px;">${secFiltered.length} students</span>`;
+  pag.innerHTML = html;
+}
+
+function secGoPage(p) {
+  secPage = p;
+  renderStudentTable();
+  renderStudentPagination();
+  document.getElementById('studentSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+
+<!-- FOOTER -->
+<footer style="
+  position: relative; z-index: 1;
+  text-align: center;
+  padding: 28px 20px;
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, transparent 0%, rgba(232,96,154,0.04) 100%);
+">
+  <p style="
+    color: var(--text3);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  ">
+    Made with
+    <span id="heartIcon" style="
+      display: inline-block;
+      font-size: 18px;
+      animation: heartbeat 1.2s ease-in-out infinite;
+      filter: drop-shadow(0 0 6px rgba(232,96,154,0.8));
+    ">❤️</span>
+    by&nbsp;<span style="
+      font-weight: 700;
+      background: linear-gradient(135deg, #e8609a, #c084c0);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-size: 15px;
+      letter-spacing: 1px;
+    ">11:13</span>
+  </p>
+</footer>
+
+<style>
+  @keyframes heartbeat {
+    0%   { transform: scale(1); }
+    14%  { transform: scale(1.25); }
+    28%  { transform: scale(1); }
+    42%  { transform: scale(1.15); }
+    70%  { transform: scale(1); }
+    100% { transform: scale(1); }
+  }
+
+  /* ========= STUDENT SECTION ========= */
+  .section-divider {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+    margin: 40px 0 32px;
+    border-radius: 2px;
+    opacity: 0.4;
+  }
+  .section-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px 28px;
+    margin-bottom: 16px;
+    position: relative; overflow: hidden;
+  }
+  .section-header::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(232,96,154,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .section-header-left { display: flex; align-items: center; gap: 16px; }
+  .section-icon {
+    font-size: 32px;
+    background: rgba(232,96,154,0.12);
+    border: 1px solid rgba(232,96,154,0.25);
+    border-radius: 14px; width: 56px; height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 4px;
+    background: linear-gradient(135deg, #fff 0%, #f0a0c0 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .section-subtitle { font-size: 12px; color: var(--text3); letter-spacing: 0.3px; }
+  .section-header-right { display: flex; align-items: center; }
+
+  /* Stats grid */
+  .sec-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .sec-stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px;
+    text-align: center; position: relative; overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .sec-stat-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .sec-stat-val { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1; margin-bottom: 6px; }
+  .sec-stat-lbl { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+
+  /* Category pills */
+  .sec-categories {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px 20px; margin-bottom: 16px;
+  }
+  .cat-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 6px 12px;
+    transition: border-color 0.2s;
+  }
+  .cat-pill:hover { border-color: var(--accent); }
+  .cat-name { font-size: 12px; font-weight: 700; color: var(--text2); }
+  .cat-count {
+    font-size: 12px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Search row */
+  .sec-search-row {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 16px; flex-wrap: wrap;
+  }
+
+  /* Table header cells */
+  .sec-th {
+    background: var(--surface2); padding: 12px 14px;
+    text-align: left; font-size: 11px; font-weight: 700;
+    color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+
+  /* Student rows */
+  .student-row { border-bottom: 1px solid rgba(61,36,56,0.5); transition: background 0.15s; }
+  .student-row:hover { background: rgba(232,96,154,0.04); }
+  .std-td { padding: 12px 14px; vertical-align: middle; }
+  .cat-badge {
+    background: rgba(232,96,154,0.10); color: #f0a0c0;
+    border: 1px solid rgba(232,96,154,0.2);
+    border-radius: 6px; padding: 3px 10px;
+    font-size: 11px; font-weight: 700;
+  }
+</style>
+
+</body>
+</html>
