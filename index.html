@@ -2463,7 +2463,8 @@ ${dynamicInstructions}
     const apiResponse = await fetch('/api/chat', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         model: 'openrouter/free',
@@ -2476,7 +2477,14 @@ ${dynamicInstructions}
       })
     });
 
-    const responseJson = await apiResponse.json();
+    const responseText = await apiResponse.text();
+    let responseJson = {};
+
+    try {
+      responseJson = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      responseJson = { error: responseText || `API error: ${apiResponse.status} ${apiResponse.statusText}` };
+    }
 
     if (!apiResponse.ok) {
       throw new Error(responseJson.error || `API error: ${apiResponse.status} ${apiResponse.statusText}`);

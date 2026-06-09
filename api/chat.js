@@ -1,6 +1,16 @@
 export default async function handler(req, res) {
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
+    res.setHeader('Allow', ['POST', 'OPTIONS']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -10,12 +20,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const {
       messages,
       model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
       max_tokens = 450,
       responseMode = 'normal'
-    } = req.body || {};
+    } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages must be a non-empty array' });
@@ -42,7 +53,14 @@ export default async function handler(req, res) {
       })
     });
 
-    const data = await upstreamResponse.json();
+    const upstreamText = await upstreamResponse.text();
+    let data = {};
+
+    try {
+      data = upstreamText ? JSON.parse(upstreamText) : {};
+    } catch {
+      data = { raw: upstreamText };
+    }
 
     if (!upstreamResponse.ok) {
       return res.status(upstreamResponse.status).json({
