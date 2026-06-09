@@ -10,11 +10,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini', max_tokens = 450 } = req.body || {};
+    const {
+      messages,
+      model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
+      max_tokens = 450,
+      responseMode = 'normal'
+    } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages must be a non-empty array' });
     }
+
+    const safeMaxTokens = responseMode === 'short'
+      ? Math.min(max_tokens, 160)
+      : responseMode === 'detailed'
+        ? Math.min(max_tokens, 850)
+        : Math.min(max_tokens, 450);
 
     const upstreamResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -27,7 +38,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model,
         messages,
-        max_tokens
+        max_tokens: safeMaxTokens
       })
     });
 

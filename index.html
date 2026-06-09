@@ -2068,6 +2068,37 @@ function parseMarkdownTables(text) {
   return resultLines.join('\n');
 }
 
+function classifyAiRequest(message) {
+  const text = message.toLowerCase();
+  const isGreeting = /^(hi|hello|hey|hii|good\s+morning|good\s+afternoon|good\s+evening)\b/.test(text) && text.length <= 20;
+  const isCollegeQuery = /(college|colleges|rank|ranking|eapcet|cse|branch|admission|allotment|cutoff|cut off|map|near|rating|rated|top\s+pick|best\s+college|good\s+college)/i.test(text);
+
+  if (isGreeting) {
+    return {
+      responseMode: 'short',
+      maxTokens: 120,
+      recentTurns: 2,
+      thinkingText: 'Thinking...'
+    };
+  }
+
+  if (isCollegeQuery) {
+    return {
+      responseMode: 'detailed',
+      maxTokens: 850,
+      recentTurns: 6,
+      thinkingText: 'Searching colleges, rankings, ratings and maps...'
+    };
+  }
+
+  return {
+    responseMode: 'normal',
+    maxTokens: 450,
+    recentTurns: 4,
+    thinkingText: 'Thinking...'
+  };
+}
+
 function renderHtmlTable(rows) {
   if (rows.length === 0) return '';
   let html = '<div class="table-wrap" style="margin:12px 0;max-width:100%;border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow);border:1px solid rgba(255,255,255,0.15);"><div class="table-scroll"><table style="width:100%;border-collapse:collapse;font-size:12.5px;background:rgba(0,0,0,0.45);">';
@@ -2224,6 +2255,8 @@ async function sendAiMessage() {
   
   const message = textarea.value.trim();
   if (!message) return;
+
+  const requestProfile = classifyAiRequest(message);
   
   textarea.value = '';
   textarea.style.height = '48px';
@@ -2240,7 +2273,10 @@ async function sendAiMessage() {
       chatHistory.after(siriGlow);
     }
   }
-  if (thinkingText) thinkingText.style.display = 'flex';
+  if (thinkingText) {
+    thinkingText.textContent = requestProfile.thinkingText;
+    thinkingText.style.display = 'flex';
+  }
   if (sendBtn) sendBtn.disabled = true;
   if (inputContainer) inputContainer.classList.add('siri-active');
   
@@ -2395,6 +2431,12 @@ async function sendAiMessage() {
   }
   
   const fullContext = [locationContext, ratingContext, rankContext].filter(Boolean).join('\n\n');
+
+  const dynamicInstructions = requestProfile.responseMode === 'short'
+    ? 'Reply in 1-2 short sentences only. Keep it friendly and direct.'
+    : requestProfile.responseMode === 'detailed'
+      ? 'Give a detailed answer. For college-related queries, include relevant colleges, best picks, ratings, ranks, Google Maps links when useful, and short tables if appropriate. Keep it organized.'
+      : 'Reply clearly and concisely. Use tables and links when useful.';
   
   const systemPrompt = `You are Aysh AI, an advanced college counselor assistant for the Telangana EAPCET engineering allotments.
 You have access to a database containing allotments, ranks, ratings, and locations of engineering colleges across Telangana (from 2015 to 2025).
@@ -2410,6 +2452,9 @@ Critical Guidelines:
 3. For tabular data, use standard Markdown tables (using | columns).
 4. Do NOT output any inline map buttons like <button onclick="window.highlightBranchOnMap..."> elements.
 5. For Google Maps links in location queries, you MUST use the exact HTML anchor tags with the actual URLs provided in the context. Never use placeholder links or example.com. For other queries, if you want to provide a Google Maps search link, use the exact anchor format shown by the app, substituting the college's name and address.
+
+Current response mode:
+${dynamicInstructions}
 `;
 
   aiChatHistoryData.push({ role: 'user', content: message });
@@ -2422,10 +2467,11 @@ Critical Guidelines:
       },
       body: JSON.stringify({
         model: 'openrouter/free',
-        max_tokens: 450,
+        max_tokens: requestProfile.maxTokens,
+        responseMode: requestProfile.responseMode,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...aiChatHistoryData.slice(-4)
+          ...aiChatHistoryData.slice(-requestProfile.recentTurns)
         ]
       })
     });
