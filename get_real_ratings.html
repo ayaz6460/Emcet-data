@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Places Real Ratings Fetcher</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fff0f6;
+      --surface: #ffffff;
+      --surface2: #fce7f3;
+      --border: #f9a8d4;
+      --accent: #db2777;
+      --accent2: #c026d3;
+      --text: #1f0a1a;
+      --text2: #6b3a5a;
+      --text3: #9d7a8a;
+      --shadow: 0 4px 20px rgba(219,39,119,0.1);
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: var(--shadow);
+      max-width: 650px;
+      width: 100%;
+      height: fit-content;
+    }
+    h2 {
+      font-weight: 800;
+      background: linear-gradient(135deg, #be185d 0%, #db2777 40%, #c026d3 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+    p {
+      color: var(--text2);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .input-group {
+      margin-bottom: 20px;
+    }
+    label {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text3);
+      letter-spacing: 0.8px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      font-size: 13px;
+      outline: none;
+      font-family: monospace;
+      box-sizing: border-box;
+      transition: all 0.2s;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(219,39,119,0.12);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(219,39,119,0.25);
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(219,39,119,0.35);
+    }
+    .btn:disabled {
+      background: #e2e8f0;
+      color: #94a3b8;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    #progress {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 20px 0 10px;
+    }
+    #log {
+      height: 220px;
+      overflow-y: scroll;
+      background: #faf6f8;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+      white-space: pre-wrap;
+    }
+    .btn-download {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 4px 12px rgba(16,185,129,0.25);
+    }
+    .btn-download:hover {
+      box-shadow: 0 6px 20px rgba(16,185,129,0.35);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Google Places Real Ratings Fetcher</h2>
+    <p>
+      This utility uses your Google Maps API key directly from the browser (matching your key's HTTP referer restrictions) to search for all 189 colleges in your dataset. It queries the actual Google Places Text Search database to retrieve real Google ratings, review counts, coordinates, and formatted addresses.
+    </p>
+    
+    <div class="input-group">
+      <label>Google Maps API Key</label>
+      <input type="text" id="apiKey" value="AIzaSyB2edojTVMikoP51SKx2-575aWlVXuMRUo">
+    </div>
+
+    <div class="input-group">
+      <button class="btn" id="startBtn" onclick="startFetching()">Start Fetching</button>
+      <a id="downloadBtn" class="btn btn-download" style="display:none; margin-left: 10px;">Download colleges_details.json</a>
+    </div>
+
+    <div id="progress">Status: Ready to start</div>
+    <div id="log">Logs will print here...</div>
+  </div>
+
+  <script>
+    let colleges = [];
+    let collegesDetails = {};
+    let currentIndex = 0;
+    let service;
+    let map;
+
+    function log(msg) {
+      const logDiv = document.getElementById('log');
+      logDiv.textContent += `\n${msg}`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    async function startFetching() {
+      const key = document.getElementById('apiKey').value.trim();
+      if (!key) {
+        alert("Please enter a Google Maps API Key.");
+        return;
+      }
+
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('apiKey').disabled = true;
+      log("Loading Google Maps JS library...");
+
+      // Load script
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
+      script.onload = () => {
+        log("Google Maps Places library loaded. Fetching colleges list from dashboard_data.json...");
+        loadCollegesList();
+      };
+      script.onerror = () => {
+        log("Error: Failed to load Google Maps script. Check your internet connection or key permissions.");
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('apiKey').disabled = false;
+      };
+      document.head.appendChild(script);
+    }
+
+    async function loadCollegesList() {
+      try {
+        const res = await fetch('dashboard_data.json');
+        if (!res.ok) throw new Error('Could not find dashboard_data.json in workspace.');
+        const json = await res.json();
+        colleges = json.colleges;
+        log(`Found ${colleges.length} colleges to geocode.`);
+        
+        // Initialize mapping context
+        const mapDiv = document.createElement('div');
+        map = new google.maps.Map(mapDiv);
+        service = new google.maps.places.PlacesService(map);
+
+        // Optional cache load
+        try {
+          const cacheRes = await fetch('colleges_details.json');
+          if (cacheRes.ok) {
+            collegesDetails = await cacheRes.json();
+            log(`Loaded ${Object.keys(collegesDetails).length} existing entries from colleges_details.json cache.`);
+          }
+        } catch (e) {}
+
+        currentIndex = 0;
+        fetchNext();
+      } catch (e) {
+        log(`Error: ${e.message}`);
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('apiKey').disabled = false;
+      }
+    }
+
+    function fetchNext() {
+      if (currentIndex >= colleges.length) {
+        finishFetching();
+        return;
+      }
+
+      const c = colleges[currentIndex];
+      document.getElementById('progress').textContent = `Processing: ${currentIndex + 1} / ${colleges.length} (${c.code})`;
+
+      // Clean name logic
+      let cleanName = c.name.replace(/^["'\s]+|["'\s]+$/g, '').trim();
+      cleanName = cleanName.replace(/COLLGE/g, 'COLLEGE');
+      cleanName = cleanName.replace(/AND SCI$/g, 'AND SCIENCE');
+      cleanName = cleanName.replace(/ENGINEERINGAND/g, 'ENGINEERING AND');
+
+      const query = `${cleanName}, Telangana, India`;
+      log(`Searching: "${query}"...`);
+
+      const request = {
+        query: query,
+        fields: ['name', 'formatted_address', 'geometry', 'rating', 'user_ratings_total']
+      };
+
+      service.textSearch(request, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+          const place = results[0];
+          collegesDetails[c.code] = {
+            lat: place.geometry.location.lat(),
+            lon: place.geometry.location.lng(),
+            address: place.formatted_address || `${cleanName}, Telangana, India`,
+            rating: place.rating || null,
+            reviews: place.user_ratings_total || 0,
+            geocoded: true,
+            realGoogle: true
+          };
+          log(`  ✓ Found: "${place.name}" | Rating: ${place.rating || 'N/A'} | Reviews: ${place.user_ratings_total || 0}`);
+        } else {
+          log(`  ⚠️ No places found (Status: ${status}). Retaining previous coordinates.`);
+          // Create dummy fallback if it doesn't exist already
+          if (!collegesDetails[c.code]) {
+            collegesDetails[c.code] = {
+              lat: 17.3850 + (Math.random() - 0.5) * 0.15,
+              lon: 78.4867 + (Math.random() - 0.5) * 0.15,
+              address: `${cleanName}, Telangana, India`,
+              rating: null,
+              reviews: 0,
+              geocoded: false,
+              realGoogle: false
+            };
+          }
+        }
+
+        currentIndex++;
+        // 600ms sleep prevents query limit thresholds
+        setTimeout(fetchNext, 600);
+      });
+    }
+
+    function finishFetching() {
+      document.getElementById('progress').textContent = `Completed!`;
+      log("\nFinished processing all colleges!");
+      
+      const blob = new Blob([JSON.stringify(collegesDetails, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const dlBtn = document.getElementById('downloadBtn');
+      dlBtn.href = url;
+      dlBtn.download = 'colleges_details.json';
+      dlBtn.style.display = 'inline-block';
+      log("\nReady! Click the green 'Download colleges_details.json' button above and save/replace it in this directory!");
+    }
+  </script>
+</body>
+</html>

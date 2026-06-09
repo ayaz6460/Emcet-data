@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EAPCET CSE Allotment Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <style>
   :root {
     --bg: #fff0f6;
@@ -337,6 +339,79 @@
     .rank-badge { font-size: 11px; padding: 3px 7px; }
     .year-tag { font-size: 11px; }
   }
+
+  /* Leaflet custom styling to match our design system */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: var(--shadow) !important;
+    padding: 2px !important;
+  }
+  .leaflet-popup-tip {
+    background: var(--surface) !important;
+    border-left: 1px solid var(--border) !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+  .leaflet-popup-content {
+    margin: 12px 14px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+  }
+  .leaflet-popup-content h4 {
+    margin-bottom: 6px;
+    font-weight: 800;
+    color: var(--accent);
+    font-size: 14px;
+    line-height: 1.2;
+  }
+  .map-rating-stars {
+    color: var(--accent4);
+    font-weight: bold;
+  }
+  .map-btn-gmaps {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white !important;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    margin-top: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(16,185,129,0.2);
+  }
+  .map-btn-gmaps:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(16,185,129,0.3);
+  }
+  .map-btn-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: white !important;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    margin-left: 6px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(219,39,119,0.2);
+  }
+  .map-btn-select:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(219,39,119,0.3);
+  }
 </style>
 </head>
 <body>
@@ -413,6 +488,20 @@
         </select>
       </div>
       <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
+    </div>
+
+    <!-- MAP SECTION -->
+    <div class="chart-card" id="map-section" style="margin-bottom: 20px; display: none;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <h3 style="margin-bottom: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--text);">
+          📍 College Map Locator
+        </h3>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span id="map-status" style="font-size: 12px; color: var(--text3); font-weight: 500;">Loading map markers...</span>
+          <button class="btn btn-ghost" style="padding: 4px 8px; font-size: 11px; margin: 0; align-self: auto;" onclick="resetMapView()">Reset View</button>
+        </div>
+      </div>
+      <div id="map" style="height: 380px; width: 100%; border-radius: 12px; border: 1.5px solid var(--border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); z-index: 10;"></div>
     </div>
 
     <div class="results-info">
@@ -588,21 +677,34 @@ let currentPage = 1;
 const PAGE_SIZE = 50;
 let filteredData = [];
 
+let collegesDetails = {};
+let map = null;
+let markers = {};
+
 // Load data
-fetch('dashboard_data.json')
-  .then(r => r.json())
-  .then(json => {
+Promise.all([
+  fetch('dashboard_data.json').then(r => r.json()),
+  fetch('colleges_details.json')
+    .then(r => r.json())
+    .catch(e => {
+      console.warn('Could not load colleges_details.json, using fallback.', e);
+      return {};
+    })
+])
+  .then(([json, details]) => {
     allData = json.data;
     years = json.years;
     colleges = json.colleges;
+    collegesDetails = details;
     init();
+    initMap();
   })
   .catch(e => {
     document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#f87171;">
       <div style="font-size:48px;">⚠️</div>
-      <h2>Could not load dashboard_data.json</h2>
-      <p style="color:#94a3b8;">Make sure dashboard_data.json is in the same folder as this HTML file.</p>
-      <code style="background:#1a2236;padding:8px 16px;border-radius:8px;color:#60a5fa;">node preprocess.js</code>
+      <h2>Could not load dashboard data files</h2>
+      <p style="color:#94a3b8;">Make sure dashboard_data.json and colleges_details.json are in the same folder as this HTML file.</p>
+      <code style="background:#1a2236;padding:8px 16px;border-radius:8px;color:#60a5fa;">node geocode_colleges.js</code>
     </div>`;
   });
 
@@ -683,6 +785,79 @@ function applyFilters() {
   } else {
     document.getElementById('studentSection').style.display = 'none';
   }
+
+  // Update map selection and marker filtering dynamically
+  const mapSection = document.getElementById('map-section');
+  const detail = collegesDetails[college];
+  if (college && detail && detail.geocoded) {
+    // Show map container when college is selected
+    if (mapSection) mapSection.style.display = 'block';
+
+    if (isGoogleMap && googleMapInstance) {
+      // Trigger map resize so it renders correctly after display: none -> block
+      google.maps.event.trigger(googleMapInstance, 'resize');
+      
+      // Filter Google markers
+      const visibleColleges = new Set(filteredData.map(r => r.college_code));
+      colleges.forEach(c => {
+        const mObj = googleMarkers[c.code];
+        if (mObj) {
+          if (filteredData.length === 0 || visibleColleges.has(c.code)) {
+            mObj.marker.setMap(googleMapInstance);
+          } else {
+            mObj.marker.setMap(null);
+          }
+        }
+      });
+
+      // Zoom to selected college
+      const mObj = googleMarkers[college];
+      if (mObj) {
+        googleMapInstance.setCenter(mObj.marker.getPosition());
+        googleMapInstance.setZoom(14);
+        if (currentInfoWindow) currentInfoWindow.close();
+        mObj.infowindow.open({
+          anchor: mObj.marker,
+          map: googleMapInstance
+        });
+        currentInfoWindow = mObj.infowindow;
+      }
+      const matchCol = colleges.find(c => c.code === college);
+      document.getElementById('map-status').textContent = `Showing: ${matchCol ? matchCol.name : college}`;
+    } else if (!isGoogleMap && leafletMapInstance) {
+      // Trigger Leaflet resize
+      leafletMapInstance.invalidateSize();
+
+      // Filter Leaflet markers
+      const visibleColleges = new Set(filteredData.map(r => r.college_code));
+      colleges.forEach(c => {
+        const marker = leafletMarkers[c.code];
+        if (marker) {
+          if (filteredData.length === 0 || visibleColleges.has(c.code)) {
+            if (!leafletMapInstance.hasLayer(marker)) {
+              marker.addTo(leafletMapInstance);
+            }
+          } else {
+            if (leafletMapInstance.hasLayer(marker)) {
+              leafletMapInstance.removeLayer(marker);
+            }
+          }
+        }
+      });
+
+      // Zoom to selected college
+      const marker = leafletMarkers[college];
+      if (marker) {
+        leafletMapInstance.setView(marker.getLatLng(), 14);
+        marker.openPopup();
+      }
+      const matchCol = colleges.find(c => c.code === college);
+      document.getElementById('map-status').textContent = `Showing: ${matchCol ? matchCol.name : college}`;
+    }
+  } else {
+    // Hide map container if no college is selected
+    if (mapSection) mapSection.style.display = 'none';
+  }
 }
 
 function renderTable() {
@@ -698,11 +873,14 @@ function renderTable() {
   }
 
   tbody.innerHTML = slice.map((r, i) => `
-    <tr>
+    <tr onclick="selectCollege('${r.college_code}', '${r.year}')" style="cursor:pointer;">
       <td style="color:var(--text3);font-size:12px;">${start + i + 1}</td>
       <td><span class="year-tag">${formatYear(r.year)}</span></td>
       <td><span class="college-code">${r.college_code}</span></td>
-      <td class="college-name" title="${r.college_name}">${truncate(r.college_name, 55)}</td>
+      <td class="college-name" title="${r.college_name}">
+        ${truncate(r.college_name, 52)}
+        ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size: 11px; white-space: nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
+      </td>
       <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
       <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
       <td><span class="students-pill">${r.total_students}</span></td>
@@ -796,11 +974,14 @@ function findColleges() {
       statusBadge = `<span class="rank-badge" style="background:rgba(239,68,68,0.10);color:#f87171;border:1px solid rgba(239,68,68,0.2);">⚠️ Marginal</span>`;
     }
 
-    return `<tr style="${rowStyle}">
+    return `<tr style="${rowStyle}cursor:pointer;" onclick="selectCollege('${r.college_code}', '${r.year}')">
       <td style="color:var(--text3);font-size:12px;">${i+1}</td>
       <td><span class="year-tag">${formatYear(r.year)}</span></td>
       <td><span class="college-code">${r.college_code}</span></td>
-      <td class="college-name" title="${r.college_name}">${truncate(r.college_name, 50)}</td>
+      <td class="college-name" title="${r.college_name}">
+        ${truncate(r.college_name, 50)}
+        ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size: 11px; white-space: nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
+      </td>
       <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
       <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
       <td>${statusBadge}</td>
@@ -893,8 +1074,29 @@ async function loadStudentSection(year, code, name) {
 
   // Header
   document.getElementById('secTitle').textContent = name;
-  document.getElementById('secSubtitle').textContent =
-    `${formatYear(year)}  \u00b7  CSE Branch  \u00b7  Code: ${code}`;
+  const detail = collegesDetails[code];
+  if (detail) {
+    const hasRating = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
+    const stars = hasRating ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating available';
+    document.getElementById('secSubtitle').innerHTML = `
+      <div style="font-size:12px; margin-bottom: 6px;">
+        ${formatYear(year)} &nbsp;&middot;&nbsp; CSE Branch &nbsp;&middot;&nbsp; Code: <span style="font-weight:700; color:var(--accent);">${code}</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--text2); margin-top:6px;">
+        <span>📍 ${detail.address}</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; margin-top:2px; flex-wrap: wrap;">
+          <span style="color:var(--accent4); font-weight:700;">${stars}</span> 
+          ${hasRating ? `<span style="color:var(--text3);">(${(detail.reviews||0).toLocaleString()} reviews · Collegedunia)</span>` : ''}
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0; padding:4px 8px; font-size:10px; margin-left:8px; line-height:1;">
+            🗺️ View on Google Maps
+          </a>
+        </span>
+      </div>
+    `;
+  } else {
+    document.getElementById('secSubtitle').textContent =
+      `${formatYear(year)}  \u00b7  CSE Branch  \u00b7  Code: ${code}`;
+  }
   document.getElementById('secStatsCards').innerHTML =
     '<div style="color:var(--text3);font-size:14px;padding:16px 0;">\u23F3 Loading students...</div>';
   document.getElementById('secCategories').innerHTML = '';
@@ -1038,6 +1240,229 @@ function secGoPage(p) {
   renderStudentPagination();
   document.getElementById('studentSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// ========== MAP DUAL INTEGRATION (GOOGLE MAPS + LEAFLET FALLBACK) ==========
+let isGoogleMap = false;
+let googleMapInstance = null;
+let leafletMapInstance = null;
+let googleMarkers = {};
+let leafletMarkers = {};
+let currentInfoWindow = null;
+
+function loadMapLibrary() {
+  // Define gm_authFailure BEFORE loading the script
+  window.gm_authFailure = function() {
+    console.warn("Google Maps authentication failed. Falling back to OpenStreetMap (Leaflet).");
+    isGoogleMap = false;
+    const mapDiv = document.getElementById('map');
+    if (mapDiv) {
+      mapDiv.innerHTML = '';
+      initLeafletMap();
+    }
+  };
+
+  // Load Google Maps script dynamically
+  const script = document.createElement('script');
+  script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyB2edojTVMikoP51SKx2-575aWlVXuMRUo&v=weekly";
+  script.defer = true;
+  script.onload = () => {
+    try {
+      if (typeof google !== 'undefined' && google.maps) {
+        initGoogleMap();
+      } else {
+        initLeafletMap();
+      }
+    } catch (e) {
+      console.warn("Error initializing Google Map, falling back to Leaflet:", e);
+      initLeafletMap();
+    }
+  };
+  script.onerror = () => {
+    console.warn("Failed to load Google Maps script. Falling back to OpenStreetMap.");
+    initLeafletMap();
+  };
+  document.head.appendChild(script);
+}
+
+function initMap() {
+  loadMapLibrary();
+}
+
+function initGoogleMap() {
+  isGoogleMap = true;
+  const hyderabad = { lat: 17.3850, lng: 78.4867 };
+  const mapDiv = document.getElementById('map');
+  if (!mapDiv) return;
+
+  googleMapInstance = new google.maps.Map(mapDiv, {
+    zoom: 9,
+    center: hyderabad,
+    mapTypeControl: true,
+    fullscreenControl: true,
+  });
+
+  colleges.forEach(c => {
+    const detail = collegesDetails[c.code];
+    if (detail && detail.lat && detail.lon && detail.geocoded) {
+      const position = { lat: detail.lat, lng: detail.lon };
+      const marker = new google.maps.Marker({
+        position: position,
+        map: googleMapInstance,
+        title: `${c.code} - ${c.name}`
+      });
+
+      const hasRatingG = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
+      const stars = hasRatingG ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating';
+      const locBadgeG = detail.geocodedApprox
+        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate location</span>`
+        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise location</span>`;
+      const popupHTML = `
+        <div style="color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.45; min-width: 200px; padding: 2px;">
+          <h4 style="margin: 0 0 6px 0; font-weight: 800; color: var(--accent); font-size: 14px;">${c.name}</h4>
+          <div style="font-size: 11px; color: var(--text3); font-weight: 700; margin-bottom: 4px;">CODE: ${c.code}</div>
+          <div style="margin-bottom: 4px;">
+            <span class="map-rating-stars">${stars}</span>
+            ${hasRatingG ? `<span style="color: var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>` : ''}
+          </div>
+          <div style="margin-bottom: 6px;">${locBadgeG}</div>
+          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px;">${detail.address}</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0;">
+              🗺️ Google Maps
+            </a>
+            <button onclick="selectCollegeFromMap('${c.code}')" class="map-btn-select" style="margin-top:0;">
+              🔍 Select
+            </button>
+          </div>
+        </div>
+      `;
+
+      const infowindow = new google.maps.InfoWindow({
+        content: popupHTML
+      });
+
+      marker.addListener("click", () => {
+        if (currentInfoWindow) currentInfoWindow.close();
+        infowindow.open({
+          anchor: marker,
+          map: googleMapInstance
+        });
+        currentInfoWindow = infowindow;
+      });
+
+      googleMarkers[c.code] = { marker, infowindow };
+    }
+  });
+
+  const mappedCount = Object.keys(googleMarkers).length;
+  document.getElementById('map-status').textContent = `Showing all ${mappedCount} colleges (Google Maps)`;
+}
+
+function initLeafletMap() {
+  isGoogleMap = false;
+  const mapDiv = document.getElementById('map');
+  if (!mapDiv) return;
+
+  mapDiv.innerHTML = '';
+
+  leafletMapInstance = L.map('map').setView([17.3850, 78.4867], 9);
+  
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(leafletMapInstance);
+
+  colleges.forEach(c => {
+    const detail = collegesDetails[c.code];
+    if (detail && detail.lat && detail.lon && detail.geocoded) {
+      const hasRatingL = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
+      const stars = hasRatingL ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating';
+      const locBadgeL = detail.geocodedApprox
+        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate location</span>`
+        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise location</span>`;
+      const popupHTML = `
+        <div style="min-width: 200px;">
+          <h4>${c.name}</h4>
+          <div style="font-size: 11px; color: var(--text3); font-weight: 700; margin-bottom: 4px;">CODE: ${c.code}</div>
+          <div style="margin-bottom: 4px;">
+            <span class="map-rating-stars">${stars}</span>
+            ${hasRatingL ? `<span style="color: var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>` : ''}
+          </div>
+          <div style="margin-bottom: 6px;">${locBadgeL}</div>
+          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.3;">${detail.address}</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps">
+              🗺️ Google Maps
+            </a>
+            <button onclick="selectCollegeFromMap('${c.code}')" class="map-btn-select">
+              🔍 Select
+            </button>
+          </div>
+        </div>
+      `;
+      const marker = L.marker([detail.lat, detail.lon]);
+      marker.bindPopup(popupHTML);
+      marker.addTo(leafletMapInstance);
+      leafletMarkers[c.code] = marker;
+    }
+  });
+
+  const mappedCount = Object.keys(leafletMarkers).length;
+  document.getElementById('map-status').textContent = `Showing all ${mappedCount} colleges (OpenStreetMap)`;
+}
+
+window.selectCollegeFromMap = function(code) {
+  const sel = document.getElementById('filterCollege');
+  if (sel) {
+    sel.value = code;
+    applyFilters();
+    document.getElementById('map-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+window.resetMapView = function() {
+  if (isGoogleMap && googleMapInstance) {
+    const bounds = new google.maps.LatLngBounds();
+    let hasMarkers = false;
+    Object.values(googleMarkers).forEach(m => {
+      if (m.marker.getMap()) {
+        bounds.extend(m.marker.getPosition());
+        hasMarkers = true;
+      }
+    });
+    if (hasMarkers) {
+      googleMapInstance.fitBounds(bounds);
+    } else {
+      googleMapInstance.setCenter({ lat: 17.3850, lng: 78.4867 });
+      googleMapInstance.setZoom(9);
+    }
+    document.getElementById('map-status').textContent = `Showing all ${Object.keys(googleMarkers).length} colleges`;
+  } else if (!isGoogleMap && leafletMapInstance) {
+    const visibleMarkers = Object.values(leafletMarkers).filter(m => leafletMapInstance.hasLayer(m));
+    if (visibleMarkers.length > 0) {
+      const group = new L.featureGroup(visibleMarkers);
+      leafletMapInstance.fitBounds(group.getBounds().pad(0.05));
+    } else {
+      leafletMapInstance.setView([17.3850, 78.4867], 9);
+    }
+    document.getElementById('map-status').textContent = `Showing all ${Object.keys(leafletMarkers).length} colleges`;
+  }
+};
+
+window.selectCollege = function(code, year) {
+  switchTab('explore');
+  document.getElementById('filterCollege').value = code;
+  if (year) {
+    document.getElementById('filterYear').value = year;
+  }
+  applyFilters();
+  setTimeout(() => {
+    const studentSec = document.getElementById('studentSection');
+    if (studentSec && studentSec.style.display !== 'none') {
+      studentSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 300);
+};
 </script>
 
 <!-- FOOTER -->
