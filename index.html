@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>EAPCET CSE Allotment Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔮</text></svg>">
+<meta name="description" content="Explore year-wise opening & closing ranks for CSE across all Telangana engineering colleges (2015–2025). Find colleges for your EAPCET rank.">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <style>
+  /* ===== DESIGN TOKENS ===== */
   :root {
     --bg: #fff0f6;
     --surface: #ffffff;
@@ -23,152 +26,202 @@
     --text3: #9d7a8a;
     --glow: rgba(219,39,119,0.10);
     --shadow: 0 2px 16px rgba(219,39,119,0.08);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --transition: 0.22s cubic-bezier(0.4,0,0.2,1);
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ===== RESET ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body {
     background: var(--bg);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* ANIMATED BG */
+  /* ===== SKELETON LOADER ===== */
+  @keyframes shimmer {
+    0%   { background-position: -800px 0; }
+    100% { background-position: 800px 0; }
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface2) 25%, #fde8f5 50%, var(--surface2) 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: var(--radius-md);
+  }
+  .skeleton-text  { height: 14px; margin-bottom: 8px; }
+  .skeleton-title { height: 28px; width: 60%; margin-bottom: 12px; }
+  .skeleton-stat  { height: 56px; }
+  .skeleton-row   { height: 48px; margin-bottom: 6px; }
+  .skeleton-btn   { height: 40px; width: 120px; border-radius: var(--radius-md); }
+
+  /* ===== ANIMATED BG ===== */
   .bg-grid {
     position: fixed; inset: 0; z-index: 0;
     background-image:
-      linear-gradient(rgba(219,39,119,0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(219,39,119,0.06) 1px, transparent 1px);
+      linear-gradient(rgba(219,39,119,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(219,39,119,0.05) 1px, transparent 1px);
     background-size: 40px 40px;
     pointer-events: none;
   }
+  .bg-orb {
+    position: fixed; pointer-events: none; z-index: 0;
+    border-radius: 50%;
+  }
   .bg-orb1 {
-    position: fixed; width: 600px; height: 600px;
-    background: radial-gradient(circle, rgba(251,207,232,0.6) 0%, transparent 70%);
-    top: -200px; left: -200px; pointer-events: none; z-index: 0;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(251,207,232,0.55) 0%, transparent 70%);
+    top: -200px; left: -200px;
+    animation: orbFloat1 12s ease-in-out infinite alternate;
   }
   .bg-orb2 {
-    position: fixed; width: 500px; height: 500px;
-    background: radial-gradient(circle, rgba(240,171,252,0.4) 0%, transparent 70%);
-    bottom: -150px; right: -150px; pointer-events: none; z-index: 0;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(240,171,252,0.35) 0%, transparent 70%);
+    bottom: -150px; right: -150px;
+    animation: orbFloat2 16s ease-in-out infinite alternate;
   }
+  @keyframes orbFloat1 { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,30px) scale(1.08); } }
+  @keyframes orbFloat2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-30px,-40px) scale(1.06); } }
 
+  /* ===== LAYOUT ===== */
   .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
-  /* HEADER */
+  /* ===== HEADER ===== */
   .header {
     text-align: center;
-    padding: 36px 16px 28px;
+    padding: 40px 16px 32px;
     margin-bottom: 28px;
+    animation: slideDown 0.6s var(--transition) both;
   }
-  .header .badge {
+  @keyframes slideDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: translateY(0); } }
+  .badge {
     display: inline-flex; align-items: center; gap: 8px;
     background: rgba(219,39,119,0.08); border: 1px solid rgba(219,39,119,0.25);
-    color: var(--accent); padding: 6px 16px; border-radius: 100px;
-    font-size: 12px; font-weight: 600; letter-spacing: 1px;
-    text-transform: uppercase; margin-bottom: 16px;
+    color: var(--accent); padding: 6px 18px; border-radius: 100px;
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; margin-bottom: 18px;
+    box-shadow: 0 2px 12px rgba(219,39,119,0.1);
   }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
   .header h1 {
-    font-size: clamp(22px, 5vw, 48px);
+    font-size: clamp(24px, 5.5vw, 52px);
     font-weight: 800;
     background: linear-gradient(135deg, #be185d 0%, #db2777 40%, #c026d3 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
     line-height: 1.15;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+    letter-spacing: -0.5px;
   }
   .header p {
     color: var(--text2); font-size: 15px; max-width: 560px; margin: 0 auto;
-    line-height: 1.6;
+    line-height: 1.65;
   }
 
-  /* STATS BAR */
+  /* ===== STATS BAR ===== */
   .stats-bar {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px; margin-bottom: 28px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-bottom: 28px;
   }
   .stat-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px; padding: 18px 16px;
+    border-radius: var(--radius-lg); padding: 20px 18px;
     position: relative; overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform var(--transition), box-shadow var(--transition);
     box-shadow: var(--shadow);
+    animation: fadeUp 0.5s var(--transition) both;
   }
-  .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(219,39,119,0.14); }
+  .stat-card:nth-child(1) { animation-delay: 0.05s; }
+  .stat-card:nth-child(2) { animation-delay: 0.10s; }
+  .stat-card:nth-child(3) { animation-delay: 0.15s; }
+  .stat-card:nth-child(4) { animation-delay: 0.20s; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+  .stat-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(219,39,119,0.16); }
   .stat-card::before {
     content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(219,39,119,0.05) 0%, transparent 60%);
+    background: linear-gradient(135deg, rgba(219,39,119,0.06) 0%, transparent 60%);
     pointer-events: none;
   }
-  .stat-card .label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 8px; font-weight: 700; }
-  .stat-card .value { font-size: 26px; font-weight: 800; color: var(--accent); line-height: 1; }
-  .stat-card .sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .stat-card .label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 700; }
+  .stat-card .value { font-size: 28px; font-weight: 800; color: var(--accent); line-height: 1; transition: transform 0.3s; }
+  .stat-card:hover .value { transform: scale(1.04); }
+  .stat-card .sub { font-size: 11px; color: var(--text3); margin-top: 6px; }
 
-  /* TABS */
+  /* ===== TABS ===== */
   .tabs {
     display: flex; gap: 4px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 14px; padding: 5px;
-    margin-bottom: 20px; width: 100%; overflow-x: auto;
+    border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 5px;
+    margin-bottom: 20px; overflow-x: auto; scrollbar-width: none;
     box-shadow: var(--shadow);
     -webkit-overflow-scrolling: touch;
   }
+  .tabs::-webkit-scrollbar { display: none; }
   .tab {
-    padding: 9px 18px; border-radius: 10px; border: none;
+    padding: 10px 20px; border-radius: var(--radius-md); border: none;
     background: transparent; color: var(--text3);
     font-size: 13px; font-weight: 600; font-family: inherit;
-    cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+    cursor: pointer; transition: all var(--transition); white-space: nowrap; flex-shrink: 0;
+    position: relative;
   }
   .tab.active {
     background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-    color: #fff; box-shadow: 0 4px 14px rgba(219,39,119,0.3);
+    color: #fff; box-shadow: 0 4px 16px rgba(219,39,119,0.32);
   }
   .tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
 
-  /* PANELS */
+  /* ===== PANELS ===== */
   .panel { display: none; }
-  .panel.active { display: block; animation: fadeIn 0.3s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .panel.active { display: block; animation: panelIn 0.35s var(--transition) both; }
+  @keyframes panelIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 
-  /* FILTER ROW */
+  /* ===== FILTER ROW ===== */
   .filter-row {
     display: flex; flex-wrap: wrap; gap: 10px;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px; padding: 16px; margin-bottom: 16px;
+    border-radius: var(--radius-lg); padding: 18px 16px; margin-bottom: 16px;
     align-items: flex-end; box-shadow: var(--shadow);
   }
-  .filter-group { display: flex; flex-direction: column; gap: 5px; min-width: 140px; flex: 1; }
-  .filter-group label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.9px; font-weight: 700; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; min-width: 140px; flex: 1; }
+  .filter-group label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
   .filter-group select,
   .filter-group input {
     background: var(--surface2); border: 1.5px solid var(--border);
-    color: var(--text); padding: 9px 12px; border-radius: 10px;
+    color: var(--text); padding: 10px 13px; border-radius: var(--radius-md);
     font-size: 13px; font-family: inherit; outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color var(--transition), box-shadow var(--transition);
     width: 100%;
     -webkit-appearance: none; appearance: none;
   }
   .filter-group select:focus,
   .filter-group input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(219,39,119,0.12);
+    box-shadow: 0 0 0 3px rgba(219,39,119,0.13);
   }
   .filter-group select option { background: #fff; color: var(--text); }
   .btn {
-    padding: 9px 18px; border-radius: 10px; border: none; cursor: pointer;
+    padding: 10px 20px; border-radius: var(--radius-md); border: none; cursor: pointer;
     font-size: 13px; font-weight: 600; font-family: inherit;
-    transition: all 0.2s; white-space: nowrap; align-self: flex-end;
+    transition: all var(--transition); white-space: nowrap; align-self: flex-end;
   }
   .btn-primary {
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff; box-shadow: 0 4px 12px rgba(219,39,119,0.25);
+    color: #fff; box-shadow: 0 4px 14px rgba(219,39,119,0.28);
   }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(219,39,119,0.35); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(219,39,119,0.38); }
   .btn-ghost {
     background: var(--surface2); border: 1.5px solid var(--border); color: var(--text2);
   }
   .btn-ghost:hover { color: var(--accent); border-color: var(--accent); background: rgba(219,39,119,0.05); }
 
-  /* RESULTS COUNT */
+  /* ===== RESULTS INFO ===== */
   .results-info {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
@@ -176,22 +229,23 @@
   .results-info .count { font-size: 13px; color: var(--text2); }
   .results-info .count span { color: var(--accent); font-weight: 700; }
 
-  /* TABLE */
+  /* ===== TABLE ===== */
   .table-wrap {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px; overflow: hidden; box-shadow: var(--shadow);
+    border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow);
   }
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th {
-    background: var(--surface2); padding: 12px 14px;
+    background: var(--surface2); padding: 13px 14px;
     text-align: left; font-size: 10px; font-weight: 700;
-    color: var(--text3); text-transform: uppercase; letter-spacing: 0.9px;
+    color: var(--text3); text-transform: uppercase; letter-spacing: 1px;
     border-bottom: 1px solid var(--border); white-space: nowrap;
-    cursor: pointer; user-select: none; transition: color 0.2s;
+    cursor: pointer; user-select: none; transition: color var(--transition);
+    position: sticky; top: 0; z-index: 2;
   }
   thead th:hover { color: var(--accent); }
-  tbody tr { border-bottom: 1px solid rgba(249,168,212,0.5); transition: background 0.15s; }
+  tbody tr { border-bottom: 1px solid rgba(249,168,212,0.45); transition: background var(--transition); }
   tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: rgba(219,39,119,0.04); }
   tbody td { padding: 12px 14px; color: var(--text); vertical-align: middle; }
@@ -211,22 +265,21 @@
   .rank-match { background: rgba(217,119,6,0.10);  color: #d97706; border: 1px solid rgba(217,119,6,0.2); }
   .students-pill {
     background: var(--surface2); color: var(--text2);
-    border-radius: 100px; padding: 3px 10px; font-size: 12px; font-weight: 600;
+    border-radius: 100px; padding: 4px 12px; font-size: 12px; font-weight: 600;
     display: inline-block; border: 1px solid var(--border);
   }
-
-  /* YEAR BADGE */
   .year-tag {
     display: inline-block; padding: 3px 10px; border-radius: 8px;
     font-size: 12px; font-weight: 700;
     background: rgba(219,39,119,0.08); color: var(--accent);
     border: 1px solid rgba(219,39,119,0.2);
+    white-space: nowrap;
   }
 
-  /* RANK FINDER SPECIAL */
+  /* ===== RANK FINDER ===== */
   .rank-input-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 20px; padding: 24px 20px; margin-bottom: 20px;
+    border-radius: var(--radius-xl); padding: 28px 24px; margin-bottom: 20px;
     position: relative; overflow: hidden; box-shadow: var(--shadow);
   }
   .rank-input-card::before {
@@ -234,14 +287,14 @@
     background: linear-gradient(135deg, rgba(219,39,119,0.05) 0%, rgba(192,38,211,0.03) 100%);
     pointer-events: none;
   }
-  .rank-input-card h3 { font-size: 17px; font-weight: 800; margin-bottom: 4px; color: var(--text); }
-  .rank-input-card p { color: var(--text2); font-size: 13px; margin-bottom: 20px; }
-  .rank-input-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .rank-input-card h3 { font-size: 18px; font-weight: 800; margin-bottom: 6px; color: var(--text); }
+  .rank-input-card > p { color: var(--text2); font-size: 13px; margin-bottom: 22px; }
+  .rank-input-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
   .rank-big-input {
     background: var(--surface2); border: 2px solid var(--border);
-    color: var(--text); padding: 12px 16px; border-radius: 14px;
+    color: var(--text); padding: 13px 18px; border-radius: var(--radius-lg);
     font-size: 26px; font-weight: 800; font-family: inherit; outline: none;
-    width: 200px; text-align: center; transition: border-color 0.2s, box-shadow 0.2s;
+    width: 200px; text-align: center; transition: border-color var(--transition), box-shadow var(--transition);
   }
   .rank-big-input:focus {
     border-color: var(--accent);
@@ -250,222 +303,546 @@
   .match-indicator {
     display: flex; align-items: center; gap: 8px;
     padding: 12px 18px; background: rgba(5,150,105,0.07);
-    border: 1px solid rgba(5,150,105,0.2); border-radius: 12px;
+    border: 1px solid rgba(5,150,105,0.2); border-radius: var(--radius-md);
     font-size: 14px; font-weight: 600; color: #059669;
+    animation: fadeUp 0.3s ease both;
   }
   .match-indicator .dot {
     width: 8px; height: 8px; border-radius: 50%;
-    background: #10b981; animation: pulse 2s infinite;
+    background: #10b981; animation: pulse 2s infinite; flex-shrink: 0;
   }
-  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.6;transform:scale(1.3);} }
-
-  /* SEARCH BUTTON */
   .rank-search-btn {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 13px 28px;
+    padding: 13px 30px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff; border: none; border-radius: 14px;
+    color: #fff; border: none; border-radius: var(--radius-lg);
     font-size: 15px; font-weight: 700; font-family: inherit;
-    cursor: pointer; transition: all 0.2s;
-    box-shadow: 0 4px 18px rgba(219,39,119,0.30);
+    cursor: pointer; transition: all var(--transition);
+    box-shadow: 0 4px 20px rgba(219,39,119,0.32);
     white-space: nowrap;
   }
-  .rank-search-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(219,39,119,0.45);
-  }
+  .rank-search-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(219,39,119,0.48); }
   .rank-search-btn:active { transform: translateY(0); }
   .rank-search-btn.loading { opacity: 0.7; pointer-events: none; }
 
-  /* CHART AREA */
+  /* ===== CHART AREA ===== */
   .chart-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px; padding: 20px; margin-bottom: 16px;
+    border-radius: var(--radius-lg); padding: 22px; margin-bottom: 16px;
     box-shadow: var(--shadow);
   }
   .chart-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 20px; color: var(--text); }
-  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
-  .bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #fff; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
 
-  /* EMPTY STATE */
-  .empty-state { text-align: center; padding: 48px 20px; color: var(--text3); }
-  .empty-state .icon { font-size: 44px; margin-bottom: 12px; }
-  .empty-state h3 { font-size: 15px; color: var(--text2); margin-bottom: 6px; font-weight: 700; }
+  /* ===== EMPTY STATE ===== */
+  .empty-state { text-align: center; padding: 52px 20px; color: var(--text3); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 14px; }
+  .empty-state h3 { font-size: 16px; color: var(--text2); margin-bottom: 6px; font-weight: 700; }
   .empty-state p { font-size: 13px; }
 
-  /* PAGINATION */
-  .pagination { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px 12px; flex-wrap: wrap; }
+  /* ===== PAGINATION ===== */
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 14px 12px; flex-wrap: wrap; }
   .page-btn {
-    padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);
+    padding: 6px 13px; border-radius: var(--radius-sm); border: 1px solid var(--border);
     background: var(--surface2); color: var(--text2); cursor: pointer;
-    font-size: 13px; font-family: inherit; transition: all 0.2s;
+    font-size: 13px; font-family: inherit; transition: all var(--transition);
   }
-  .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 8px rgba(219,39,119,0.25); }
+  .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 10px rgba(219,39,119,0.28); }
   .page-btn:hover:not(.active):not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(219,39,119,0.06); }
   .page-btn:disabled { opacity: 0.3; cursor: default; }
 
-  /* SCROLLBAR */
+  /* ===== ANIMATIONS ===== */
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.6;transform:scale(1.3);} }
+  @keyframes heartbeat {
+    0%   { transform: scale(1); }
+    14%  { transform: scale(1.28); }
+    28%  { transform: scale(1); }
+    42%  { transform: scale(1.16); }
+    70%  { transform: scale(1); }
+    100% { transform: scale(1); }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Row entrance animation */
+  tbody tr {
+    animation: rowIn 0.25s ease both;
+  }
+  @keyframes rowIn { from { opacity:0; } to { opacity:1; } }
+
+  /* ===== SCROLLBAR ===== */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: var(--surface2); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--accent3); }
 
+  /* ===== MAP ===== */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface) !important; color: var(--text) !important;
+    border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow) !important; padding: 2px !important;
+  }
+  .leaflet-popup-tip { background: var(--surface) !important; border-left: 1px solid var(--border) !important; border-bottom: 1px solid var(--border) !important; }
+  .leaflet-popup-content { margin: 12px 14px !important; font-family: 'Inter', sans-serif !important; font-size: 13px !important; line-height: 1.45 !important; }
+  .leaflet-popup-content h4 { margin-bottom: 6px; font-weight: 800; color: var(--accent); font-size: 14px; line-height: 1.2; }
+  .map-rating-stars { color: var(--accent4); font-weight: bold; }
+  .map-btn-gmaps {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, #10b981, #059669); color: white !important;
+    border: none; padding: 6px 12px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; text-decoration: none;
+    margin-top: 8px; transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(16,185,129,0.2);
+  }
+  .map-btn-gmaps:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(16,185,129,0.3); }
+  .map-btn-select {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white !important; border: none; padding: 6px 12px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 8px; margin-left: 6px;
+    transition: all 0.2s; box-shadow: 0 2px 6px rgba(219,39,119,0.2);
+  }
+  .map-btn-select:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(219,39,119,0.3); }
+
+  /* ===== STUDENT SECTION ===== */
+  .section-divider {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+    margin: 40px 0 32px; border-radius: 2px; opacity: 0.4;
+  }
+  .section-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-xl); padding: 24px 24px;
+    margin-bottom: 16px; position: relative; overflow: hidden;
+  }
+  .section-header::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(219,39,119,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .section-header-left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+  .section-icon {
+    font-size: 28px; background: rgba(219,39,119,0.10); border: 1px solid rgba(219,39,119,0.2);
+    border-radius: var(--radius-md); width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .section-header-text { min-width: 0; }
+  .section-title {
+    font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 4px;
+    background: linear-gradient(135deg, #be185d, #db2777);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .section-subtitle { font-size: 12px; color: var(--text3); }
+  .section-header-right { display: flex; align-items: center; flex-shrink: 0; }
+
+  /* Stats grid */
+  .sec-stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .sec-stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 16px 18px;
+    text-align: center; position: relative; overflow: hidden;
+    transition: transform var(--transition), border-color var(--transition);
+  }
+  .sec-stat-card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 6px 20px rgba(219,39,119,0.12); }
+  .sec-stat-val { font-size: 24px; font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+  .sec-stat-lbl { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+
+  /* Category pills */
+  .sec-categories {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 16px;
+  }
+  .cat-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 6px 12px;
+    transition: border-color var(--transition);
+  }
+  .cat-pill:hover { border-color: var(--accent); }
+  .cat-name { font-size: 12px; font-weight: 700; color: var(--text2); }
+  .cat-count {
+    font-size: 12px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  /* Search row */
+  .sec-search-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+
+  /* Table header cells */
+  .sec-th {
+    background: var(--surface2); padding: 12px 14px;
+    text-align: left; font-size: 10px; font-weight: 700;
+    color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+    position: sticky; top: 0; z-index: 2;
+  }
+
+  /* Student rows */
+  .student-row { border-bottom: 1px solid rgba(249,168,212,0.45); transition: background var(--transition); }
+  .student-row:hover { background: rgba(219,39,119,0.04); }
+  .std-td { padding: 11px 14px; vertical-align: middle; }
+  .cat-badge {
+    background: rgba(219,39,119,0.08); color: var(--accent);
+    border: 1px solid rgba(219,39,119,0.18);
+    border-radius: 6px; padding: 3px 10px;
+    font-size: 11px; font-weight: 700;
+  }
+
+  /* ===== BRANCH CAMPUSES ===== */
+  .branch-panel {
+    margin-top: 14px; padding: 14px 16px;
+    background: linear-gradient(135deg, rgba(219,39,119,0.07), rgba(192,38,211,0.06));
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    animation: fadeUp 0.3s ease both;
+  }
+  .branch-panel-title {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    letter-spacing: 0.6px; margin-bottom: 10px; text-transform: uppercase;
+  }
+  .branch-chips {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .branch-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 7px 12px; font-size: 11px; cursor: pointer; color: var(--text);
+    font-family: 'Inter', sans-serif; transition: all var(--transition); font-weight: 500;
+    text-align: left; line-height: 1.3;
+    flex: 0 1 auto; min-width: 0; max-width: 100%;
+    word-break: break-word;
+  }
+  .branch-chip:hover {
+    background: var(--accent); color: #fff;
+    border-color: var(--accent); transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(219,39,119,0.25);
+  }
+  .branch-chip strong { font-weight: 700; flex-shrink: 0; }
+  .branch-chip span { overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== LOADING SPINNER ===== */
+  .spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 2.5px solid rgba(219,39,119,0.2);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.7s linear infinite; vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  /* ===== TOAST NOTIFICATION ===== */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    background: var(--text); color: #fff;
+    padding: 12px 20px; border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: calc(100vw - 40px);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ===== FOOTER ===== */
+  footer {
+    position: relative; z-index: 1;
+    text-align: center; padding: 28px 20px; margin-top: 48px;
+    border-top: 1px solid var(--border);
+    background: linear-gradient(180deg, transparent 0%, rgba(232,96,154,0.04) 100%);
+  }
+
+  /* ===== SKELETON LOADING STATES ===== */
+  .skeleton-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 28px; }
+  .skeleton-stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 20px 18px; box-shadow: var(--shadow);
+  }
+  .skeleton-table-row { padding: 14px; border-bottom: 1px solid rgba(249,168,212,0.3); }
+
   /* ===== RESPONSIVE ===== */
+
+  /* ---- 1200px ---- */
+  @media (max-width: 1200px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .skeleton-stats { grid-template-columns: repeat(2,1fr); }
+  }
+
+  /* ---- 1024px ---- */
   @media (max-width: 1024px) {
     .container { padding: 16px 14px; }
-    .stats-bar { grid-template-columns: repeat(2, 1fr); }
-    .header { padding: 28px 12px 24px; }
+    .header { padding: 32px 12px 26px; }
   }
+
+  /* ---- 768px ---- */
   @media (max-width: 768px) {
-    .container { padding: 12px 10px; }
-    .header { padding: 24px 10px 20px; margin-bottom: 20px; }
+    .container { padding: 12px 12px; }
+    .header { padding: 28px 8px 22px; margin-bottom: 20px; }
     .header p { font-size: 13px; }
+
     .stats-bar { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 20px; }
-    .stat-card { padding: 14px 12px; }
+    .skeleton-stats { grid-template-columns: repeat(2,1fr); gap: 8px; }
+    .stat-card { padding: 15px 13px; }
     .stat-card .value { font-size: 22px; }
-    .tabs { border-radius: 12px; padding: 4px; }
-    .tab { padding: 8px 14px; font-size: 12px; }
-    .filter-row { flex-direction: column; gap: 8px; padding: 14px 12px; }
+
+    .tabs { border-radius: var(--radius-md); padding: 4px; gap: 2px; }
+    .tab { padding: 9px 14px; font-size: 12px; }
+
+    .filter-row { flex-direction: column; gap: 8px; padding: 14px 13px; }
     .filter-group { min-width: 100%; flex: none; }
-    .btn { width: 100%; justify-content: center; }
-    .rank-input-row { flex-direction: column; align-items: stretch; }
-    .rank-big-input { width: 100%; font-size: 22px; padding: 12px; }
-    .rank-input-card { padding: 18px 14px; }
+    .btn { width: 100%; justify-content: center; display: flex; }
+
+    .rank-input-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    .rank-big-input { width: 100%; font-size: 22px; padding: 12px 14px; }
+    .rank-input-card { padding: 20px 16px; }
+    .rank-search-btn { width: 100%; justify-content: center; }
+
     .results-info { flex-direction: column; align-items: flex-start; gap: 4px; }
-    .section-header { flex-direction: column; gap: 12px; padding: 16px 14px; }
-    .section-header-right { width: 100%; }
+    .section-header { padding: 18px 16px; }
+    .section-header-left { gap: 12px; }
+    .section-title { font-size: 15px; }
+    .section-icon { width: 44px; height: 44px; font-size: 24px; border-radius: var(--radius-md); }
+    .sec-search-row { flex-direction: column; align-items: stretch; gap: 8px; }
+    .sec-search-row > div { max-width: 100% !important; }
     .sec-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .sec-stat-card { padding: 14px 12px; }
     .sec-stat-val { font-size: 20px; }
-    .section-icon { width: 44px; height: 44px; font-size: 24px; border-radius: 12px; }
-    .sec-search-row { flex-direction: column; align-items: stretch; gap: 8px; }
-    .sec-search-row > div { max-width: 100% !important; }
+
+    /* Branch chips full-width on mobile */
+    .branch-chips { gap: 6px; }
+    .branch-chip { flex: 1 1 calc(50% - 6px); min-width: 0; }
+
     tbody td, thead th { padding: 10px 10px; font-size: 12px; }
     .sec-th { padding: 10px 10px !important; }
+    .std-td { padding: 9px 10px; }
     .chart-card { padding: 14px; }
-    .pagination { gap: 4px; padding: 10px 8px; }
+    .pagination { gap: 3px; padding: 10px 8px; }
     .page-btn { padding: 5px 10px; font-size: 12px; }
-  }
-  @media (max-width: 480px) {
-    .header h1 { font-size: 20px; }
-    .stats-bar { grid-template-columns: repeat(2, 1fr); }
-    .stat-card .value { font-size: 18px; }
-    .sec-stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .filter-group select, .filter-group input { font-size: 14px; padding: 10px 12px; }
-    .table-wrap { border-radius: 12px; }
-    tbody td { padding: 9px 8px; }
-    .rank-badge { font-size: 11px; padding: 3px 7px; }
-    .year-tag { font-size: 11px; }
+
+    .match-indicator { flex-wrap: wrap; gap: 6px; font-size: 13px; }
+    .filter-group select, .filter-group input { padding: 11px 13px; font-size: 14px; }
   }
 
-  /* Leaflet custom styling to match our design system */
-  .leaflet-popup-content-wrapper {
-    background: var(--surface) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    box-shadow: var(--shadow) !important;
-    padding: 2px !important;
+  /* ---- 480px ---- */
+  @media (max-width: 480px) {
+    .container { padding: 10px 10px; }
+    .header h1 { font-size: 22px; }
+    .header p { font-size: 12px; }
+    .badge { font-size: 10px; padding: 5px 13px; }
+
+    .stats-bar { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+    .stat-card { padding: 13px 11px; }
+    .stat-card .value { font-size: 19px; }
+    .stat-card .label { font-size: 9px; }
+    .stat-card .sub { font-size: 10px; }
+
+    .tab { padding: 8px 11px; font-size: 11px; }
+
+    .sec-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+    .section-header { padding: 14px 13px; }
+    .section-title { font-size: 14px; }
+    .section-icon { width: 38px; height: 38px; font-size: 20px; }
+
+    /* Campuses chips: full row on tiny screens */
+    .branch-chip { flex: 1 1 100%; }
+
+    .table-wrap { border-radius: var(--radius-md); }
+    tbody td { padding: 8px 8px; font-size: 11px; }
+    .rank-badge { font-size: 10px; padding: 3px 7px; }
+    .year-tag { font-size: 10px; }
+
+    .page-btn { padding: 4px 8px; font-size: 11px; }
+
+    .rank-big-input { font-size: 20px; }
+    .rank-search-btn { font-size: 14px; padding: 12px 20px; }
+
+    .toast { bottom: 16px; right: 16px; left: 16px; max-width: none; }
   }
-  .leaflet-popup-tip {
-    background: var(--surface) !important;
-    border-left: 1px solid var(--border) !important;
-    border-bottom: 1px solid var(--border) !important;
+
+  /* ---- 360px ---- */
+  @media (max-width: 360px) {
+    .header h1 { font-size: 19px; }
+    .tab { padding: 7px 9px; font-size: 10px; }
+    .stat-card .value { font-size: 17px; }
   }
-  .leaflet-popup-content {
-    margin: 12px 14px !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 13px !important;
-    line-height: 1.45 !important;
-  }
-  .leaflet-popup-content h4 {
-    margin-bottom: 6px;
-    font-weight: 800;
-    color: var(--accent);
-    font-size: 14px;
-    line-height: 1.2;
-  }
-  .map-rating-stars {
-    color: var(--accent4);
-    font-weight: bold;
-  }
-  .map-btn-gmaps {
+
+  /* ===== AYSH AI ASSISTANT STYLES ===== */
+  .btn-quick-action {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white !important;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 600;
-    text-decoration: none;
-    margin-top: 8px;
-    transition: all 0.2s;
-    box-shadow: 0 2px 6px rgba(16,185,129,0.2);
-  }
-  .map-btn-gmaps:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(16,185,129,0.3);
-  }
-  .map-btn-select {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-    color: white !important;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 11px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    color: #f1f5f9;
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    margin-top: 8px;
-    margin-left: 6px;
-    transition: all 0.2s;
-    box-shadow: 0 2px 6px rgba(219,39,119,0.2);
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(6px);
   }
-  .map-btn-select:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(219,39,119,0.3);
+  .btn-quick-action:hover {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border-color: transparent;
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(219,39,119,0.4);
+  }
+  .siri-wave-glow {
+    position: relative;
+    width: 200px;
+    height: 48px;
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+  }
+  .siri-blob {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    filter: blur(6px);
+    opacity: 0.85;
+    animation: siriFloat 1.8s ease-in-out infinite alternate;
+  }
+  .blob-red {
+    background: #ff2d55;
+    animation-delay: 0s;
+    box-shadow: 0 0 12px #ff2d55;
+  }
+  .blob-purple {
+    background: #af52de;
+    animation-delay: 0.3s;
+    box-shadow: 0 0 12px #af52de;
+  }
+  .blob-blue {
+    background: #5ac8fa;
+    animation-delay: 0.6s;
+    box-shadow: 0 0 12px #5ac8fa;
+  }
+  @keyframes siriFloat {
+    0% { transform: scale(1) translateY(0); opacity: 0.6; filter: blur(5px); }
+    100% { transform: scale(1.6) translateY(-8px); opacity: 0.95; filter: blur(9px); }
+  }
+  .chat-bubble {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13.5px;
+    line-height: 1.5;
+    word-break: break-word;
+    font-family: inherit;
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  .chat-bubble.user {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #ffffff;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+    box-shadow: 0 4px 12px rgba(219,39,119,0.22);
+  }
+  .chat-bubble.ai {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #f8fafc;
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .chat-bubble.ai code {
+    background: rgba(0,0,0,0.5);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #fda4af;
+  }
+  .chat-bubble.ai pre {
+    background: rgba(0,0,0,0.6);
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    margin: 8px 0;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .chat-bubble.ai p {
+    margin-bottom: 8px;
+  }
+  .chat-bubble.ai p:last-child {
+    margin-bottom: 0;
+  }
+  .chat-bubble.ai ul, .chat-bubble.ai ol {
+    margin-left: 18px;
+    margin-bottom: 8px;
+  }
+  .chat-bubble.ai li {
+    margin-bottom: 4px;
+  }
+  .siri-glowing-ring {
+    position: absolute;
+    inset: -2px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(90deg, #ff2d55, #af52de, #5ac8fa, #ff2d55);
+    background-size: 400% 400%;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .siri-active .siri-glowing-ring {
+    opacity: 0.8;
+    animation: siriRingGlow 6s linear infinite;
+  }
+  @keyframes siriRingGlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
   }
 </style>
 </head>
 <body>
 <div class="bg-grid"></div>
-<div class="bg-orb1"></div>
-<div class="bg-orb2"></div>
+<div class="bg-orb bg-orb1"></div>
+<div class="bg-orb bg-orb2"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
 
 <div class="container">
+
   <!-- HEADER -->
   <div class="header">
-    <div class="badge">📊 EAPCET CSE Allotment Intelligence</div>
+    <div class="badge"><span class="dot"></span> EAPCET CSE Allotment Intelligence</div>
     <h1>College Allotment Dashboard</h1>
     <p>Explore year-wise opening &amp; closing ranks for CSE across all Telangana engineering colleges (2015 – 2025)</p>
   </div>
 
-  <!-- STATS BAR -->
+  <!-- STATS BAR (skeleton → real) -->
   <div class="stats-bar" id="statsBar">
-    <div class="stat-card">
+    <!-- Skeleton placeholders -->
+    <div class="stat-card" id="sc-total">
       <div class="label">Total Records</div>
-      <div class="value" id="stat-total">–</div>
-      <div class="sub">Student allotments</div>
+      <div class="value skeleton skeleton-stat" id="stat-total" style="width:70%;height:28px;border-radius:6px;"></div>
+      <div class="sub skeleton skeleton-text" style="width:55%;margin-top:8px;"></div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" id="sc-years">
       <div class="label">Year / Phases</div>
-      <div class="value" id="stat-years">–</div>
-      <div class="sub">2015 – 2025</div>
+      <div class="value skeleton skeleton-stat" id="stat-years" style="width:50%;height:28px;border-radius:6px;"></div>
+      <div class="sub" style="margin-top:8px;">2015 – 2025</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" id="sc-colleges">
       <div class="label">Colleges</div>
-      <div class="value" id="stat-colleges">–</div>
-      <div class="sub">Across Telangana</div>
+      <div class="value skeleton skeleton-stat" id="stat-colleges" style="width:60%;height:28px;border-radius:6px;"></div>
+      <div class="sub skeleton skeleton-text" style="width:70%;margin-top:8px;"></div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" id="sc-best">
       <div class="label">Best Opening Rank</div>
-      <div class="value" id="stat-best">–</div>
-      <div class="sub">In current view</div>
+      <div class="value skeleton skeleton-stat" id="stat-best" style="width:65%;height:28px;border-radius:6px;"></div>
+      <div class="sub skeleton skeleton-text" style="width:60%;margin-top:8px;"></div>
     </div>
   </div>
 
@@ -474,6 +851,21 @@
     <button class="tab active" onclick="switchTab('explore')" id="tab-explore">🔍 Explore Data</button>
     <button class="tab" onclick="switchTab('finder')" id="tab-finder">🎯 Rank Finder</button>
     <button class="tab" onclick="switchTab('trends')" id="tab-trends">📈 Year Trends</button>
+    <button class="tab" onclick="switchTab('ai-assistant')" id="tab-ai-assistant">🔮 Aysh AI Assistant</button>
+  </div>
+
+  <!-- MAP SECTION -->
+  <div class="chart-card" id="map-section" style="margin-bottom:20px;display:none;margin-top:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <h3 style="margin-bottom:0;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:var(--text);">
+        📍 College Map Locator
+      </h3>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="map-status" style="font-size:12px;color:var(--text3);font-weight:500;">Loading map markers...</span>
+        <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;margin:0;align-self:auto;display:inline-flex;width:auto;" onclick="resetMapView()">Reset View</button>
+      </div>
+    </div>
+    <div id="map" style="height:360px;width:100%;border-radius:var(--radius-md);border:1.5px solid var(--border);box-shadow:inset 0 2px 4px rgba(0,0,0,0.06);z-index:10;"></div>
   </div>
 
   <!-- PANEL: EXPLORE DATA -->
@@ -482,7 +874,7 @@
       <div class="filter-group">
         <label>Year / Phase</label>
         <select id="filterYear" onchange="applyFilters()">
-          <option value="">All Years & Phases</option>
+          <option value="">All Years &amp; Phases</option>
         </select>
       </div>
       <div class="filter-group">
@@ -505,57 +897,62 @@
           <option value="year">Year</option>
         </select>
       </div>
-      <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
+      <button class="btn btn-ghost" onclick="resetFilters()">↺ Reset</button>
     </div>
 
-    <!-- MAP SECTION -->
-    <div class="chart-card" id="map-section" style="margin-bottom: 20px; display: none;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-        <h3 style="margin-bottom: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--text);">
-          📍 College Map Locator
-        </h3>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span id="map-status" style="font-size: 12px; color: var(--text3); font-weight: 500;">Loading map markers...</span>
-          <button class="btn btn-ghost" style="padding: 4px 8px; font-size: 11px; margin: 0; align-self: auto;" onclick="resetMapView()">Reset View</button>
+    <!-- Skeleton table while loading -->
+    <div id="skeletonTable" style="margin-bottom:16px;">
+      <div class="table-wrap">
+        <div style="padding:14px 16px;">
+          <div class="skeleton skeleton-text" style="width:30%;margin-bottom:16px;"></div>
+        </div>
+        <div style="padding:0 0 8px 0;">
+          <div class="skeleton-table-row skeleton" style="height:14px;margin:0 16px 8px;border-radius:6px;"></div>
+          <div class="skeleton-table-row skeleton" style="height:14px;margin:0 16px 8px;border-radius:6px;width:85%;"></div>
+          <div class="skeleton-table-row skeleton" style="height:14px;margin:0 16px 8px;border-radius:6px;width:92%;"></div>
+          <div class="skeleton-table-row skeleton" style="height:14px;margin:0 16px 8px;border-radius:6px;width:78%;"></div>
+          <div class="skeleton-table-row skeleton" style="height:14px;margin:0 16px 8px;border-radius:6px;width:88%;"></div>
+          <div class="skeleton-table-row skeleton" style="height:14px;margin:0 16px 8px;border-radius:6px;width:65%;"></div>
         </div>
       </div>
-      <div id="map" style="height: 380px; width: 100%; border-radius: 12px; border: 1.5px solid var(--border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); z-index: 10;"></div>
     </div>
 
-    <div class="results-info">
-      <div class="count">Showing <span id="resultCount">0</span> results</div>
-      <div id="paginationTop"></div>
-    </div>
-
-    <div class="table-wrap">
-      <div class="table-scroll">
-        <table id="exploreTable">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Year / Phase</th>
-              <th>Code</th>
-              <th>College Name</th>
-              <th>Opening Rank</th>
-              <th>Closing Rank</th>
-              <th>Students</th>
-            </tr>
-          </thead>
-          <tbody id="exploreBody"></tbody>
-        </table>
+    <div id="exploreContent" style="display:none;">
+      <div class="results-info">
+        <div class="count">Showing <span id="resultCount">0</span> results</div>
+        <div id="paginationTop"></div>
       </div>
-      <div class="pagination" id="paginationBottom"></div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table id="exploreTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Year / Phase</th>
+                <th>Code</th>
+                <th>College Name</th>
+                <th>Opening Rank</th>
+                <th>Closing Rank</th>
+                <th>Students</th>
+              </tr>
+            </thead>
+            <tbody id="exploreBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="paginationBottom"></div>
+      </div>
     </div>
 
-    <!-- STUDENT SECTION (shows when year + college both selected) -->
+    <!-- STUDENT SECTION -->
     <div id="studentSection" style="display:none;margin-top:32px;">
-      <!-- Section Header -->
       <div class="section-header">
         <div class="section-header-left">
           <div class="section-icon">👥</div>
-          <div>
+          <div class="section-header-text">
             <h2 id="secTitle" class="section-title"></h2>
-            <p id="secSubtitle" class="section-subtitle"></p>
+            <div id="secSubtitle" class="section-subtitle"></div>
+            <!-- Branch panel renders here -->
+            <div id="branchPanel"></div>
           </div>
         </div>
         <div class="section-header-right" id="secStatsPills"></div>
@@ -574,10 +971,10 @@
           <input type="text" id="studentSearch"
             placeholder="Search by name, roll no, category, region…"
             oninput="filterStudents()"
-            style="width:100%;padding:11px 14px 11px 42px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s;"
+            style="width:100%;padding:11px 14px 11px 42px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-md);font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s;"
             onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
         </div>
-        <div id="secSearchCount" style="font-size:13px;color:var(--text3);"></div>
+        <div id="secSearchCount" style="font-size:13px;color:var(--text3);white-space:nowrap;"></div>
       </div>
 
       <!-- Student Table -->
@@ -603,7 +1000,7 @@
       </div>
     </div>
 
-  </div>
+  </div><!-- /panel-explore -->
 
   <!-- PANEL: RANK FINDER -->
   <div class="panel" id="panel-finder">
@@ -616,19 +1013,19 @@
           <input type="number" class="rank-big-input" id="myRank" placeholder="e.g. 25000" min="1" max="300000"
             onkeydown="if(event.key==='Enter') findColleges()">
         </div>
-        <div class="filter-group" style="max-width:200px;">
+        <div class="filter-group" style="max-width:220px;">
           <label>Year / Phase</label>
           <select id="finderYear">
             <option value="">All Years</option>
           </select>
         </div>
-        <div class="filter-group" style="max-width:200px;">
+        <div class="filter-group" style="max-width:220px;">
           <label>Max Opening Rank Buffer</label>
           <select id="finderBuffer">
-            <option value="0">Exact (&le; Closing Rank)</option>
-            <option value="5000" selected>&plusmn;5,000 rank buffer</option>
-            <option value="10000">&plusmn;10,000 rank buffer</option>
-            <option value="20000">&plusmn;20,000 rank buffer</option>
+            <option value="0">Exact (≤ Closing Rank)</option>
+            <option value="5000" selected>±5,000 rank buffer</option>
+            <option value="10000">±10,000 rank buffer</option>
+            <option value="20000">±20,000 rank buffer</option>
           </select>
         </div>
         <div>
@@ -692,9 +1089,85 @@
     </div>
   </div>
 
-</div>
+  <!-- PANEL: AYSH AI ASSISTANT -->
+  <div class="panel" id="panel-ai-assistant">
+    <div style="position:relative; width:100%; min-height:800px; background-image:url('https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/ruixen_moon_2.png'); background-size:cover; background-position:center; border-radius:var(--radius-xl); border:1.5px solid var(--border); overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; box-shadow:var(--shadow); margin-bottom:28px;">
+      
+      <!-- Ambient Siri Glow Ring -->
+      <div class="siri-glowing-ring" id="aiGlowingRing"></div>
+
+      <!-- Top Title Bar -->
+      <div style="background:rgba(0,0,0,0.45); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.1); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; z-index:2;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">🔮</span>
+          <span style="color:#ffffff; font-weight:800; font-size:15px; letter-spacing:0.5px; font-family:'Inter',sans-serif;">AYSH AI ASSISTANT</span>
+          <span style="font-size:10px; background:#10b98122; color:#10b981; border:1px solid #10b98155; border-radius:4px; padding:1px 6px; font-weight:700;">ONLINE</span>
+        </div>
+        <div style="color:rgba(255,255,255,0.6); font-size:11px; font-weight:600;">EAPCET Allotment Expert</div>
+      </div>
+
+      <!-- Center Title & Siri waves (Hidden after first message is sent) -->
+      <div id="aiWelcomeView" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; text-align:center; z-index:2;">
+        <h1 style="font-size:clamp(28px, 6vw, 42px); font-weight:800; color:#ffffff; text-shadow:0 2px 14px rgba(0,0,0,0.7); margin-bottom:12px; letter-spacing:-0.5px;">Aysh AI</h1>
+        <p style="color:rgba(255,255,255,0.9); font-size:15px; text-shadow:0 1px 8px rgba(0,0,0,0.6); max-width:520px; line-height:1.6; margin-bottom:20px;">
+          Explore best rated colleges, find local campuses near your area, measure distances, and check ranks instantly. Just type below to begin.
+        </p>
+        
+        <!-- Apple Siri style wave glow -->
+        <div class="siri-wave-glow" id="siriGlow" style="display:none;">
+          <div class="siri-blob blob-red"></div>
+          <div class="siri-blob blob-purple"></div>
+          <div class="siri-blob blob-blue"></div>
+        </div>
+      </div>
+
+      <!-- Chat History Area -->
+      <div id="aiChatHistory" style="display:none; flex:1; overflow-y:auto; padding:20px; flex-direction:column; gap:16px; max-height:620px; z-index:2;">
+        <!-- Dynamic bubbles appear here -->
+      </div>
+
+      <!-- Bottom Input area and Quick Actions -->
+      <div style="padding:20px; background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 100%); z-index:2;">
+        <!-- Input wrapper -->
+        <div id="aiInputContainer" style="position:relative; background:rgba(0,0,0,0.65); backdrop-filter:blur(12px); border-radius:var(--radius-md); border:1.5px solid rgba(255,255,255,0.25); display:flex; flex-direction:column; padding:10px 14px; box-shadow:0 8px 32px rgba(0,0,0,0.4); transition: border-color 0.25s, box-shadow 0.25s;">
+          <textarea id="aiTextarea" placeholder="Ask Aysh AI... e.g. Find colleges near Ghatkesar" style="width:100%; min-height:48px; max-height:120px; background:transparent; border:none; outline:none; color:#ffffff; font-family:inherit; font-size:14px; resize:none; padding:4px 0; line-height:1.5; box-shadow:none; overflow-y:auto;" oninput="adjustAiTextareaHeight()" onkeydown="handleAiTextareaKeydown(event)"></textarea>
+          
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+            <button onclick="showToast('📎 Attachment feature is coming soon!')" style="background:transparent; border:none; color:rgba(255,255,255,0.7); cursor:pointer; font-size:16px; padding:4px; transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.7)'">📎</button>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div id="aiThinkingText" style="display:none; align-items:center; justify-content:center;">
+                <div class="spinner" style="margin-right:0; width:16px; height:16px; border-width:2.5px; border-color:rgba(255,255,255,0.25); border-top-color:#ffffff; animation: spin 0.8s linear infinite;"></div>
+              </div>
+              <button id="aiSendBtn" onclick="sendAiMessage()" style="background:linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); border:none; color:#ffffff; font-weight:700; border-radius:8px; padding:7px 18px; font-size:12px; cursor:pointer; transition:transform 0.15s, box-shadow 0.15s; box-shadow:0 4px 10px rgba(219,39,119,0.3);" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">Send</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick actions -->
+        <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:16px;">
+          <button class="btn-quick-action" onclick="setAiQuery('Which are the best rated colleges in our database?')">⭐ Top Rated Colleges</button>
+          <button class="btn-quick-action" onclick="setAiQuery('Show engineering colleges near Ghatkesar on map')">📍 Colleges Near Ghatkesar</button>
+          <button class="btn-quick-action" onclick="setAiQuery('Show engineering colleges near Gachibowli on map')">📍 Colleges Near Gachibowli</button>
+          <button class="btn-quick-action" onclick="setAiQuery('Show colleges near Kukatpally')">📍 Colleges Near Kukatpally</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- FOOTER -->
+<footer>
+  <p style="color:var(--text3);font-size:14px;font-weight:500;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
+    Made by Love for&nbsp;<span style="font-weight:800;background:linear-gradient(135deg,#be185d,#db2777,#c026d3);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:15px;letter-spacing:1px;">13</span>&nbsp;By&nbsp;<span style="font-weight:800;background:linear-gradient(135deg,#be185d,#db2777,#c026d3);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:15px;letter-spacing:1px;">11</span>&nbsp;<span id="heartIcon" style="display:inline-block;font-size:18px;animation:heartbeat 1.2s ease-in-out infinite;filter:drop-shadow(0 0 6px rgba(219,39,119,0.7));">❤️</span>
+  </p>
+</footer>
 
 <script>
+// ===========================
+// STATE
+// ===========================
 let allData = [];
 let years = [];
 let colleges = [];
@@ -705,21 +1178,25 @@ let filteredData = [];
 let collegesDetails = {};
 let map = null;
 let markers = {};
-
-// Load data
 let collegeGroups = { codeToGroup: {}, groupMap: {} };
 
+// ===========================
+// TOAST
+// ===========================
+function showToast(msg, duration = 2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ===========================
+// LOAD DATA
+// ===========================
 Promise.all([
   fetch('dashboard_data.json').then(r => r.json()),
-  fetch('colleges_details.json')
-    .then(r => r.json())
-    .catch(e => {
-      console.warn('Could not load colleges_details.json, using fallback.', e);
-      return {};
-    }),
-  fetch('college_groups.json')
-    .then(r => r.json())
-    .catch(() => ({ codeToGroup: {}, groupMap: {} }))
+  fetch('colleges_details.json').then(r => r.json()).catch(() => ({})),
+  fetch('college_groups.json').then(r => r.json()).catch(() => ({ codeToGroup:{}, groupMap:{} }))
 ])
   .then(([json, details, groups]) => {
     allData = json.data;
@@ -731,20 +1208,39 @@ Promise.all([
     initMap();
   })
   .catch(e => {
-    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#f87171;">
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#f87171;padding:20px;text-align:center;">
       <div style="font-size:48px;">⚠️</div>
-      <h2>Could not load dashboard data files</h2>
-      <p style="color:#94a3b8;">Make sure dashboard_data.json and colleges_details.json are in the same folder as this HTML file.</p>
-      <code style="background:#1a2236;padding:8px 16px;border-radius:8px;color:#60a5fa;">node geocode_colleges.js</code>
+      <h2>Could not load dashboard data</h2>
+      <p style="color:#94a3b8;max-width:420px;">Make sure dashboard_data.json and colleges_details.json are in the same folder as this HTML file, and you are running a local server.</p>
+      <code style="background:#1a2236;padding:8px 16px;border-radius:8px;color:#60a5fa;font-size:13px;">npx serve .</code>
     </div>`;
   });
 
+// ===========================
+// INIT
+// ===========================
 function init() {
-  // Stats
+  // Animate stat values in
   const totalStudents = allData.reduce((s, r) => s + r.total_students, 0);
+  animateNumber('stat-total', totalStudents);
+  animateNumber('stat-years', years.length);
+  animateNumber('stat-colleges', colleges.length);
+
+  // Remove skeletons from stat cards
+  ['sc-total','sc-years','sc-colleges','sc-best'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const val = el.querySelector('.value');
+      if (val) { val.classList.remove('skeleton','skeleton-stat'); val.style = ''; }
+      el.querySelectorAll('.sub').forEach(s => { s.classList.remove('skeleton','skeleton-text'); s.style = ''; });
+    }
+  });
   document.getElementById('stat-total').textContent = totalStudents.toLocaleString();
   document.getElementById('stat-years').textContent = years.length;
   document.getElementById('stat-colleges').textContent = colleges.length;
+  document.querySelector('#sc-total .sub').textContent = 'Student allotments';
+  document.querySelector('#sc-colleges .sub').textContent = 'Across Telangana';
+  document.querySelector('#sc-best .sub').textContent = 'In current view';
 
   // Populate selects
   const yearSels = [document.getElementById('filterYear'), document.getElementById('finderYear')];
@@ -755,29 +1251,54 @@ function init() {
       sel.appendChild(opt);
     });
   });
-
   const collegeSel = document.getElementById('filterCollege');
   const trendsSel = document.getElementById('trendsCollege');
   colleges.forEach(c => {
     [collegeSel, trendsSel].forEach(sel => {
       const opt = document.createElement('option');
-      opt.value = c.code;
-      opt.textContent = `${c.code} – ${c.name}`;
+      opt.value = c.code; opt.textContent = `${c.code} – ${c.name}`;
       sel.appendChild(opt);
     });
   });
 
   applyFilters();
+
+  // Show explore content, hide skeleton
+  document.getElementById('skeletonTable').style.display = 'none';
+  document.getElementById('exploreContent').style.display = 'block';
 }
 
+function animateNumber(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('skeleton','skeleton-stat');
+  el.style = '';
+  let start = 0;
+  const step = Math.ceil(target / 40);
+  const timer = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = start.toLocaleString();
+    if (start >= target) clearInterval(timer);
+  }, 30);
+}
+
+// ===========================
+// FORMAT
+// ===========================
 function formatYear(y) {
-  if (y === '2025_1_PHASE') return '2025 – Phase 1';
-  if (y === '2025_2_PHASE') return '2025 – Phase 2';
+  if (y === '2025_1_PHASE')     return '2025 – Phase 1';
+  if (y === '2025_2_PHASE')     return '2025 – Phase 2';
   if (y === '2025_FINAL_PHASE') return '2025 – Final Phase';
-  if (y === '2025_MOCK_PHASE') return '2025 – Mock Phase';
+  if (y === '2025_MOCK_PHASE')  return '2025 – Mock Phase';
   return y;
 }
+function truncate(str, len) {
+  return str.length > len ? str.slice(0, len) + '…' : str;
+}
 
+// ===========================
+// FILTERS
+// ===========================
 function applyFilters() {
   const year    = document.getElementById('filterYear').value;
   const college = document.getElementById('filterCollege').value;
@@ -792,11 +1313,11 @@ function applyFilters() {
   });
 
   filteredData.sort((a, b) => {
-    if (sortBy === 'opening_rank')  return a.opening_rank - b.opening_rank;
-    if (sortBy === 'closing_rank')  return a.closing_rank - b.closing_rank;
-    if (sortBy === 'college_name')  return a.college_name.localeCompare(b.college_name);
-    if (sortBy === 'total_students')return b.total_students - a.total_students;
-    if (sortBy === 'year')          return a.year.localeCompare(b.year) || a.college_name.localeCompare(b.college_name);
+    if (sortBy === 'opening_rank')   return a.opening_rank - b.opening_rank;
+    if (sortBy === 'closing_rank')   return a.closing_rank - b.closing_rank;
+    if (sortBy === 'college_name')   return a.college_name.localeCompare(b.college_name);
+    if (sortBy === 'total_students') return b.total_students - a.total_students;
+    if (sortBy === 'year')           return a.year.localeCompare(b.year) || a.college_name.localeCompare(b.college_name);
     return 0;
   });
 
@@ -808,7 +1329,7 @@ function applyFilters() {
   renderTable();
   renderPagination();
 
-  // Auto-load student section when both year + college are selected
+  // Auto-load student section
   if (year && college) {
     const row = allData.find(r => r.year === year && r.college_code === college);
     const collegeName = row ? row.college_name : college;
@@ -817,80 +1338,66 @@ function applyFilters() {
     document.getElementById('studentSection').style.display = 'none';
   }
 
-  // Update map selection and marker filtering dynamically
+  // Map logic
   const mapSection = document.getElementById('map-section');
   const detail = collegesDetails[college];
   if (college && detail && detail.geocoded) {
-    // Show map container when college is selected
     if (mapSection) mapSection.style.display = 'block';
-
     if (isGoogleMap && googleMapInstance) {
-      // Trigger map resize so it renders correctly after display: none -> block
       google.maps.event.trigger(googleMapInstance, 'resize');
-      
-      // Filter Google markers
       const visibleColleges = new Set(filteredData.map(r => r.college_code));
       colleges.forEach(c => {
         const mObj = googleMarkers[c.code];
         if (mObj) {
-          if (filteredData.length === 0 || visibleColleges.has(c.code)) {
-            mObj.marker.setMap(googleMapInstance);
-          } else {
-            mObj.marker.setMap(null);
-          }
+          if (filteredData.length === 0 || visibleColleges.has(c.code)) mObj.marker.setMap(googleMapInstance);
+          else mObj.marker.setMap(null);
         }
       });
-
-      // Zoom to selected college
       const mObj = googleMarkers[college];
       if (mObj) {
         googleMapInstance.setCenter(mObj.marker.getPosition());
         googleMapInstance.setZoom(14);
         if (currentInfoWindow) currentInfoWindow.close();
-        mObj.infowindow.open({
-          anchor: mObj.marker,
-          map: googleMapInstance
-        });
+        mObj.infowindow.open({ anchor: mObj.marker, map: googleMapInstance });
         currentInfoWindow = mObj.infowindow;
       }
       const matchCol = colleges.find(c => c.code === college);
       document.getElementById('map-status').textContent = `Showing: ${matchCol ? matchCol.name : college}`;
     } else if (!isGoogleMap && leafletMapInstance) {
-      // Trigger Leaflet resize
       leafletMapInstance.invalidateSize();
-
-      // Filter Leaflet markers
       const visibleColleges = new Set(filteredData.map(r => r.college_code));
       colleges.forEach(c => {
         const marker = leafletMarkers[c.code];
         if (marker) {
           if (filteredData.length === 0 || visibleColleges.has(c.code)) {
-            if (!leafletMapInstance.hasLayer(marker)) {
-              marker.addTo(leafletMapInstance);
-            }
+            if (!leafletMapInstance.hasLayer(marker)) marker.addTo(leafletMapInstance);
           } else {
-            if (leafletMapInstance.hasLayer(marker)) {
-              leafletMapInstance.removeLayer(marker);
-            }
+            if (leafletMapInstance.hasLayer(marker)) leafletMapInstance.removeLayer(marker);
           }
         }
       });
-
-      // Zoom to selected college
       const marker = leafletMarkers[college];
-      if (marker) {
-        leafletMapInstance.setView(marker.getLatLng(), 14);
-        marker.openPopup();
-      }
+      if (marker) { leafletMapInstance.setView(marker.getLatLng(), 14); marker.openPopup(); }
       const matchCol = colleges.find(c => c.code === college);
       document.getElementById('map-status').textContent = `Showing: ${matchCol ? matchCol.name : college}`;
     }
   } else {
-    // Hide map container if no college is selected
     if (mapSection) mapSection.style.display = 'none';
   }
 }
 
+function resetFilters() {
+  document.getElementById('filterYear').value = '';
+  document.getElementById('filterCollege').value = '';
+  document.getElementById('filterSearch').value = '';
+  document.getElementById('filterSort').value = 'opening_rank';
+  applyFilters();
+  showToast('Filters reset ↺');
+}
+
+// ===========================
+// TABLE
+// ===========================
 function renderTable() {
   const tbody = document.getElementById('exploreBody');
   const start = (currentPage - 1) * PAGE_SIZE;
@@ -904,13 +1411,13 @@ function renderTable() {
   }
 
   tbody.innerHTML = slice.map((r, i) => `
-    <tr onclick="selectCollege('${r.college_code}', '${r.year}')" style="cursor:pointer;">
+    <tr onclick="selectCollege('${r.college_code}', '${r.year}')" style="cursor:pointer;" title="Click to view students">
       <td style="color:var(--text3);font-size:12px;">${start + i + 1}</td>
       <td><span class="year-tag">${formatYear(r.year)}</span></td>
       <td><span class="college-code">${r.college_code}</span></td>
       <td class="college-name" title="${r.college_name}">
         ${truncate(r.college_name, 52)}
-        ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size: 11px; white-space: nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
+        ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size:11px;white-space:nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
       </td>
       <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
       <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
@@ -924,8 +1431,7 @@ function renderPagination() {
   const paginationHTML = () => {
     if (totalPages <= 1) return '';
     let html = `<button class="page-btn" ${currentPage===1?'disabled':''} onclick="goPage(${currentPage-1})">← Prev</button>`;
-    const pages = getPageNums(currentPage, totalPages);
-    pages.forEach(p => {
+    getPageNums(currentPage, totalPages).forEach(p => {
       if (p === '...') html += `<span style="color:var(--text3);padding:0 4px;">…</span>`;
       else html += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
     });
@@ -950,14 +1456,9 @@ function goPage(p) {
   document.getElementById('panel-explore').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function resetFilters() {
-  document.getElementById('filterYear').value = '';
-  document.getElementById('filterCollege').value = '';
-  document.getElementById('filterSearch').value = '';
-  document.getElementById('filterSort').value = 'opening_rank';
-  applyFilters();
-}
-
+// ===========================
+// RANK FINDER
+// ===========================
 function findColleges() {
   const rankVal = parseInt(document.getElementById('myRank').value, 10);
   const year = document.getElementById('finderYear').value;
@@ -974,16 +1475,13 @@ function findColleges() {
     return;
   }
 
-  // Show loading state on button
-  if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ Searching…'; }
+  if (btn) { btn.classList.add('loading'); btn.innerHTML = '<span class="spinner"></span>Searching…'; }
 
-  // Allow browser to paint loading state before heavy work
   setTimeout(() => {
     let matched = allData.filter(r => {
       if (year && r.year !== year) return false;
       return rankVal <= (r.closing_rank + buffer);
     });
-
     matched.sort((a, b) => a.opening_rank - b.opening_rank);
 
     indicator.style.display = 'flex';
@@ -998,7 +1496,7 @@ function findColleges() {
     }
 
     tbody.innerHTML = matched.map((r, i) => {
-      const inRange = rankVal >= r.opening_rank && rankVal <= r.closing_rank;
+      const inRange  = rankVal >= r.opening_rank && rankVal <= r.closing_rank;
       const aboveOpen = rankVal < r.opening_rank;
       let statusBadge, rowStyle = '';
       if (aboveOpen) {
@@ -1010,14 +1508,13 @@ function findColleges() {
       } else {
         statusBadge = `<span class="rank-badge" style="background:rgba(239,68,68,0.10);color:#f87171;border:1px solid rgba(239,68,68,0.2);">⚠️ Marginal</span>`;
       }
-
-      return `<tr style="${rowStyle}cursor:pointer;" onclick="selectCollege('${r.college_code}', '${r.year}')">
+      return `<tr style="${rowStyle}cursor:pointer;" onclick="selectCollege('${r.college_code}','${r.year}')">
         <td style="color:var(--text3);font-size:12px;">${i+1}</td>
         <td><span class="year-tag">${formatYear(r.year)}</span></td>
         <td><span class="college-code">${r.college_code}</span></td>
         <td class="college-name" title="${r.college_name}">
           ${truncate(r.college_name, 50)}
-          ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size: 11px; white-space: nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
+          ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size:11px;white-space:nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
         </td>
         <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
         <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
@@ -1026,11 +1523,14 @@ function findColleges() {
       </tr>`;
     }).join('');
 
-    // Restore button
     if (btn) { btn.classList.remove('loading'); btn.innerHTML = '🔍 Search Colleges'; }
+    showToast(`✅ Found ${matched.length} colleges for rank ${rankVal.toLocaleString()}`);
   }, 30);
 }
 
+// ===========================
+// YEAR TRENDS
+// ===========================
 function renderTrends() {
   const code = document.getElementById('trendsCollege').value;
   const container = document.getElementById('trendsContent');
@@ -1042,33 +1542,32 @@ function renderTrends() {
   const rows = allData.filter(r => r.college_code === code).sort((a, b) => a.year.localeCompare(b.year));
   const collegeName = rows.length ? rows[0].college_name : code;
 
-  if (rows.length === 0) {
+  if (!rows.length) {
     container.innerHTML = `<div class="empty-state"><div class="icon">😕</div><h3>No data</h3><p>No allotment data found for this college</p></div>`;
     return;
   }
 
   const maxRank = Math.max(...rows.map(r => r.closing_rank));
-
   const barsHTML = rows.map(r => {
-    const openPct = Math.max(2, (r.opening_rank / maxRank) * 100);
-    const closePct = Math.max(2, (r.closing_rank / maxRank) * 100);
+    const openPct  = Math.max(4, (r.opening_rank / maxRank) * 100);
+    const closePct = Math.max(4, (r.closing_rank / maxRank) * 100);
     return `
-      <div style="margin-bottom:20px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div style="margin-bottom:22px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;flex-wrap:wrap;gap:6px;">
           <span class="year-tag">${formatYear(r.year)}</span>
           <span style="font-size:12px;color:var(--text3);">${r.total_students} students</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <span style="font-size:11px;color:var(--text3);width:90px;text-align:right;">Opening</span>
-            <div style="flex:1;height:24px;background:var(--surface2);border-radius:6px;overflow:hidden;">
-              <div style="width:${openPct.toFixed(1)}%;height:100%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:6px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;">${r.opening_rank.toLocaleString()}</div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;color:var(--text3);width:62px;text-align:right;flex-shrink:0;">Opening</span>
+            <div style="flex:1;height:26px;background:var(--surface2);border-radius:6px;overflow:hidden;">
+              <div style="width:${openPct.toFixed(1)}%;height:100%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:6px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;transition:width 0.8s ease;">${r.opening_rank.toLocaleString()}</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <span style="font-size:11px;color:var(--text3);width:90px;text-align:right;">Closing</span>
-            <div style="flex:1;height:24px;background:var(--surface2);border-radius:6px;overflow:hidden;">
-              <div style="width:${closePct.toFixed(1)}%;height:100%;background:linear-gradient(90deg,#ef4444,#f87171);border-radius:6px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;">${r.closing_rank.toLocaleString()}</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;color:var(--text3);width:62px;text-align:right;flex-shrink:0;">Closing</span>
+            <div style="flex:1;height:26px;background:var(--surface2);border-radius:6px;overflow:hidden;">
+              <div style="width:${closePct.toFixed(1)}%;height:100%;background:linear-gradient(90deg,#ef4444,#f87171);border-radius:6px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;transition:width 0.8s ease;">${r.closing_rank.toLocaleString()}</div>
             </div>
           </div>
         </div>
@@ -1076,7 +1575,7 @@ function renderTrends() {
   }).join('');
 
   const summary = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:22px;">
       <div class="stat-card"><div class="label">Best Opening</div><div class="value" style="font-size:22px;">${Math.min(...rows.map(r=>r.opening_rank)).toLocaleString()}</div></div>
       <div class="stat-card"><div class="label">Worst Closing</div><div class="value" style="font-size:22px;">${maxRank.toLocaleString()}</div></div>
       <div class="stat-card"><div class="label">Data Points</div><div class="value" style="font-size:22px;">${rows.length}</div></div>
@@ -1087,10 +1586,13 @@ function renderTrends() {
     <div class="chart-card">
       <h3>📊 Year-wise Opening &amp; Closing Ranks — ${collegeName}</h3>
       ${summary}
-      <div class="bar-chart">${barsHTML}</div>
+      <div>${barsHTML}</div>
     </div>`;
 }
 
+// ===========================
+// TAB SWITCHING
+// ===========================
 function switchTab(tab) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1098,81 +1600,65 @@ function switchTab(tab) {
   document.getElementById(`tab-${tab}`).classList.add('active');
 }
 
-function truncate(str, len) {
-  return str.length > len ? str.slice(0, len) + '…' : str;
-}
-
-// ========== INLINE STUDENT SECTION ==========
-let secStudents  = [];   // all students for current college+year
-let secFiltered  = [];   // post-search
-let secPage      = 1;
-const SEC_PAGE   = 100;
-let yearCache    = {};   // loaded year JSONs
+// ===========================
+// STUDENT SECTION
+// ===========================
+let secStudents = [], secFiltered = [], secPage = 1;
+const SEC_PAGE = 100;
+let yearCache = {};
 
 async function loadStudentSection(year, code, name) {
   const sec = document.getElementById('studentSection');
   sec.style.display = 'block';
 
-  // Header
   document.getElementById('secTitle').textContent = name;
   const detail = collegesDetails[code];
   if (detail) {
     const hasRating = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
     const stars = hasRating ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating available';
     document.getElementById('secSubtitle').innerHTML = `
-      <div style="font-size:12px; margin-bottom: 6px;">
-        ${formatYear(year)} &nbsp;&middot;&nbsp; CSE Branch &nbsp;&middot;&nbsp; Code: <span style="font-weight:700; color:var(--accent);">${code}</span>
+      <div style="font-size:12px;margin-bottom:5px;">
+        ${formatYear(year)} &nbsp;·&nbsp; CSE Branch &nbsp;·&nbsp; Code: <span style="font-weight:700;color:var(--accent);">${code}</span>
       </div>
-      <div style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--text2); margin-top:6px;">
+      <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text2);margin-top:5px;">
         <span>📍 ${detail.address}</span>
-        <span style="display:inline-flex; align-items:center; gap:6px; margin-top:2px; flex-wrap: wrap;">
-          <span style="color:var(--accent4); font-weight:700;">${stars}</span>
-          ${hasRating ? `<span style="color:var(--text3);">(${(detail.reviews||0).toLocaleString()} reviews &middot; Collegedunia)</span>` : ''}
-          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0; padding:4px 8px; font-size:10px; margin-left:8px; line-height:1;">
-            🗺️ View on Google Maps
+        <span style="display:inline-flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+          <span style="color:var(--accent4);font-weight:700;">${stars}</span>
+          ${hasRating ? `<span style="color:var(--text3);">(${(detail.reviews||0).toLocaleString()} reviews · Collegedunia)</span>` : ''}
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0;padding:4px 9px;font-size:10px;line-height:1;">
+            🗺️ Google Maps
           </a>
         </span>
       </div>
     `;
   } else {
-    document.getElementById('secSubtitle').textContent =
-      `${formatYear(year)}  \u00b7  CSE Branch  \u00b7  Code: ${code}`;
+    document.getElementById('secSubtitle').textContent = `${formatYear(year)}  ·  CSE Branch  ·  Code: ${code}`;
   }
 
   // === BRANCH CAMPUSES PANEL ===
+  const branchPanel = document.getElementById('branchPanel');
   const brand = collegeGroups.codeToGroup?.[code];
-  const branchPanel = document.getElementById('branchPanel') || (() => {
-    const p = document.createElement('div');
-    p.id = 'branchPanel';
-    document.getElementById('secSubtitle').parentElement.insertAdjacentElement('afterend', p);
-    return p;
-  })();
 
   if (brand && collegeGroups.groupMap?.[brand]) {
     const siblings = collegeGroups.groupMap[brand].filter(b => b.code !== code);
     if (siblings.length > 0) {
+      // Build responsive chip list
+      const chips = siblings.map(s => {
+        const sd = collegesDetails[s.code];
+        const hasPin = sd && sd.lat && sd.lon && sd.geocoded;
+        const shortName = s.name.split(' ').slice(0, 5).join(' ');
+        return `<button class="branch-chip" onclick="highlightBranchOnMap('${s.code}');" title="${s.name}">
+          <span style="flex-shrink:0;">${hasPin ? '📍' : '❓'}</span>
+          <strong>${s.code}</strong>
+          <span>— ${shortName}</span>
+        </button>`;
+      }).join('');
+
       branchPanel.innerHTML = `
-        <div style="margin-top:12px; padding:10px 14px; background:linear-gradient(135deg,rgba(219,39,119,0.07),rgba(192,38,211,0.07)); border:1px solid var(--border); border-radius:12px;">
-          <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.5px; margin-bottom:8px; text-transform:uppercase;">
-            🏫 ${brand} &mdash; Other Campuses (${siblings.length})
-          </div>
-          <div style="display:flex; flex-wrap:wrap; gap:6px;">
-            ${siblings.map(s => {
-              const sd = collegesDetails[s.code];
-              const hasPin = sd && sd.lat && sd.lon && sd.geocoded;
-              return `<button onclick="highlightBranchOnMap('${s.code}');" style="
-                background:var(--surface2); border:1px solid var(--border); border-radius:8px;
-                padding:5px 10px; font-size:11px; cursor:pointer; color:var(--text);
-                font-family:'Inter',sans-serif; transition:all 0.2s; font-weight:500;
-                display:flex; align-items:center; gap:5px;
-              " onmouseover="this.style.background='var(--accent)';this.style.color='#fff';" onmouseout="this.style.background='var(--surface2)';this.style.color='var(--text)';">
-                ${hasPin ? '📍' : '❓'} <strong>${s.code}</strong> &mdash; ${s.name.split(' ').slice(0,4).join(' ')}
-              </button>`;
-            }).join('')}
-          </div>
-        </div>
-      `;
-      // Highlight all branches on the map
+        <div class="branch-panel">
+          <div class="branch-panel-title">🏫 ${brand} — Other Campuses (${siblings.length})</div>
+          <div class="branch-chips">${chips}</div>
+        </div>`;
       highlightGroupOnMap(collegeGroups.groupMap[brand].map(b => b.code));
     } else {
       branchPanel.innerHTML = '';
@@ -1182,14 +1668,36 @@ async function loadStudentSection(year, code, name) {
     branchPanel.innerHTML = '';
     highlightGroupOnMap([code]);
   }
-  document.getElementById('secStatsCards').innerHTML =
-    '<div style="color:var(--text3);font-size:14px;padding:16px 0;">\u23F3 Loading students...</div>';
+
+  // Loading skeleton for student stats
+  document.getElementById('secStatsCards').innerHTML = `
+    <div class="sec-stat-card">
+      <div class="skeleton" style="height:24px;width:60%;margin:0 auto 8px;border-radius:6px;"></div>
+      <div class="skeleton skeleton-text" style="width:80%;margin:0 auto;"></div>
+    </div>
+    <div class="sec-stat-card">
+      <div class="skeleton" style="height:24px;width:60%;margin:0 auto 8px;border-radius:6px;"></div>
+      <div class="skeleton skeleton-text" style="width:80%;margin:0 auto;"></div>
+    </div>
+    <div class="sec-stat-card">
+      <div class="skeleton" style="height:24px;width:60%;margin:0 auto 8px;border-radius:6px;"></div>
+      <div class="skeleton skeleton-text" style="width:80%;margin:0 auto;"></div>
+    </div>
+    <div class="sec-stat-card">
+      <div class="skeleton" style="height:24px;width:60%;margin:0 auto 8px;border-radius:6px;"></div>
+      <div class="skeleton skeleton-text" style="width:80%;margin:0 auto;"></div>
+    </div>`;
+
   document.getElementById('secCategories').innerHTML = '';
-  document.getElementById('studentBody').innerHTML = '';
+  document.getElementById('studentBody').innerHTML = `
+    <tr><td colspan="8" style="padding:16px;">
+      <div class="skeleton" style="height:14px;width:90%;border-radius:6px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:14px;width:75%;border-radius:6px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:14px;width:82%;border-radius:6px;"></div>
+    </td></tr>`;
   document.getElementById('studentSearch').value = '';
   document.getElementById('studentPagination').innerHTML = '';
 
-  // Scroll into view
   setTimeout(() => sec.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 
   // Load year file (cached)
@@ -1199,14 +1707,14 @@ async function loadStudentSection(year, code, name) {
       yearCache[year] = await res.json();
     } catch(e) {
       document.getElementById('secStatsCards').innerHTML =
-        '<div style="color:#f87171;padding:16px 0;">\u26a0\ufe0f Could not load student data. Make sure the server is running.</div>';
+        '<div style="color:#f87171;padding:16px 0;">⚠️ Could not load student data. Make sure the server is running.</div>';
       return;
     }
   }
 
   secStudents = yearCache[year][code] || [];
   secFiltered = [...secStudents];
-  secPage     = 1;
+  secPage = 1;
   renderSecStats();
   renderStudentTable();
   renderStudentPagination();
@@ -1225,37 +1733,16 @@ function renderSecStats() {
   const male   = total - female;
 
   document.getElementById('secStatsCards').innerHTML = `
-    <div class="sec-stat-card">
-      <div class="sec-stat-val">${total.toLocaleString()}</div>
-      <div class="sec-stat-lbl">Total Students</div>
-    </div>
-    <div class="sec-stat-card" style="--card-accent:#34d399;">
-      <div class="sec-stat-val" style="color:#34d399;">${minR.toLocaleString()}</div>
-      <div class="sec-stat-lbl">Opening Rank</div>
-    </div>
-    <div class="sec-stat-card" style="--card-accent:#f87171;">
-      <div class="sec-stat-val" style="color:#f87171;">${maxR.toLocaleString()}</div>
-      <div class="sec-stat-lbl">Closing Rank</div>
-    </div>
-    <div class="sec-stat-card" style="--card-accent:#93c5fd;">
-      <div class="sec-stat-val" style="color:#93c5fd;">${male}</div>
-      <div class="sec-stat-lbl">Male (\u2642)</div>
-    </div>
-    <div class="sec-stat-card" style="--card-accent:#f0a0c0;">
-      <div class="sec-stat-val" style="color:#f0a0c0;">${female}</div>
-      <div class="sec-stat-lbl">Female (\u2640)</div>
-    </div>`;
+    <div class="sec-stat-card"><div class="sec-stat-val">${total.toLocaleString()}</div><div class="sec-stat-lbl">Total Students</div></div>
+    <div class="sec-stat-card" style="--card-accent:#34d399;"><div class="sec-stat-val" style="color:#34d399;">${minR.toLocaleString()}</div><div class="sec-stat-lbl">Opening Rank</div></div>
+    <div class="sec-stat-card" style="--card-accent:#f87171;"><div class="sec-stat-val" style="color:#f87171;">${maxR.toLocaleString()}</div><div class="sec-stat-lbl">Closing Rank</div></div>
+    <div class="sec-stat-card" style="--card-accent:#93c5fd;"><div class="sec-stat-val" style="color:#93c5fd;">${male}</div><div class="sec-stat-lbl">Male (♂)</div></div>
+    <div class="sec-stat-card" style="--card-accent:#f0a0c0;"><div class="sec-stat-val" style="color:#f0a0c0;">${female}</div><div class="sec-stat-lbl">Female (♀)</div></div>`;
 
-  // Category breakdown
   const catMap = {};
   secStudents.forEach(s => { catMap[s.category] = (catMap[s.category]||0)+1; });
-  const catHTML = Object.entries(catMap)
-    .sort((a,b) => b[1]-a[1])
-    .map(([k,v]) => `
-      <div class="cat-pill">
-        <span class="cat-name">${k}</span>
-        <span class="cat-count">${v}</span>
-      </div>`).join('');
+  const catHTML = Object.entries(catMap).sort((a,b) => b[1]-a[1]).map(([k,v]) => `
+    <div class="cat-pill"><span class="cat-name">${k}</span><span class="cat-count">${v}</span></div>`).join('');
   document.getElementById('secCategories').innerHTML =
     `<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">Category Breakdown</div>
      <div style="display:flex;flex-wrap:wrap;gap:8px;">${catHTML}</div>`;
@@ -1284,8 +1771,7 @@ function renderStudentTable() {
   const start = (secPage - 1) * SEC_PAGE;
   const slice = secFiltered.slice(start, start + SEC_PAGE);
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text3);">
-      No students match your search</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text3);">No students match your search</td></tr>`;
     return;
   }
   const gCol = g => g === 'F' ? '#f0a0c0' : '#93c5fd';
@@ -1295,7 +1781,7 @@ function renderStudentTable() {
       <td class="std-td" style="font-weight:700;color:var(--accent);font-size:15px;">${s.rank.toLocaleString()}</td>
       <td class="std-td" style="font-weight:600;color:var(--text);">${s.name}</td>
       <td class="std-td" style="font-family:monospace;font-size:12px;color:var(--text2);">${s.rollno}</td>
-      <td class="std-td"><span style="color:${gCol(s.gender)};font-weight:700;">${s.gender==='F'?'\u2640 F':'\u2642 M'}</span></td>
+      <td class="std-td"><span style="color:${gCol(s.gender)};font-weight:700;">${s.gender==='F'?'♀ F':'♂ M'}</span></td>
       <td class="std-td" style="color:var(--text2);">${s.region}</td>
       <td class="std-td"><span class="cat-badge">${s.category}</span></td>
       <td class="std-td" style="color:var(--text3);font-size:11px;">${s.seat_cat}</td>
@@ -1326,7 +1812,9 @@ function secGoPage(p) {
   document.getElementById('studentSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ========== MAP DUAL INTEGRATION (GOOGLE MAPS + LEAFLET FALLBACK) ==========
+// ===========================
+// MAP
+// ===========================
 let isGoogleMap = false;
 let googleMapInstance = null;
 let leafletMapInstance = null;
@@ -1335,123 +1823,73 @@ let leafletMarkers = {};
 let currentInfoWindow = null;
 
 function loadMapLibrary() {
-  // Define gm_authFailure BEFORE loading the script
   window.gm_authFailure = function() {
-    console.warn("Google Maps authentication failed. Falling back to OpenStreetMap (Leaflet).");
+    console.warn('Google Maps auth failed. Falling back to Leaflet.');
     isGoogleMap = false;
     const mapDiv = document.getElementById('map');
-    if (mapDiv) {
-      mapDiv.innerHTML = '';
-      initLeafletMap();
-    }
+    if (mapDiv) { mapDiv.innerHTML = ''; initLeafletMap(); }
   };
-
-  // Load Google Maps script dynamically
   const script = document.createElement('script');
-  script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyB2edojTVMikoP51SKx2-575aWlVXuMRUo&v=weekly";
+  script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyB2edojTVMikoP51SKx2-575aWlVXuMRUo&v=weekly';
   script.defer = true;
   script.onload = () => {
     try {
-      if (typeof google !== 'undefined' && google.maps) {
-        initGoogleMap();
-      } else {
-        initLeafletMap();
-      }
-    } catch (e) {
-      console.warn("Error initializing Google Map, falling back to Leaflet:", e);
-      initLeafletMap();
-    }
+      if (typeof google !== 'undefined' && google.maps) initGoogleMap();
+      else initLeafletMap();
+    } catch(e) { console.warn('Google Maps init error:', e); initLeafletMap(); }
   };
-  script.onerror = () => {
-    console.warn("Failed to load Google Maps script. Falling back to OpenStreetMap.");
-    initLeafletMap();
-  };
+  script.onerror = () => { console.warn('Google Maps script failed. Using Leaflet.'); initLeafletMap(); };
   document.head.appendChild(script);
 }
 
-function initMap() {
-  loadMapLibrary();
-}
+function initMap() { loadMapLibrary(); }
 
 function initGoogleMap() {
   isGoogleMap = true;
   const hyderabad = { lat: 17.3850, lng: 78.4867 };
   const mapDiv = document.getElementById('map');
   if (!mapDiv) return;
-
-  googleMapInstance = new google.maps.Map(mapDiv, {
-    zoom: 9,
-    center: hyderabad,
-    mapTypeControl: true,
-    fullscreenControl: true,
-  });
-
+  googleMapInstance = new google.maps.Map(mapDiv, { zoom:9, center:hyderabad, mapTypeControl:true, fullscreenControl:true });
   colleges.forEach(c => {
     const detail = collegesDetails[c.code];
     if (detail && detail.lat && detail.lon && detail.geocoded) {
       const position = { lat: detail.lat, lng: detail.lon };
-      const marker = new google.maps.Marker({
-        position: position,
-        map: googleMapInstance,
-        title: `${c.code} - ${c.name}`
-      });
-
+      const marker = new google.maps.Marker({ position, map: googleMapInstance, title: `${c.code} - ${c.name}` });
       const hasRatingG = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
       const stars = hasRatingG ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating';
-      const locBadgeG = detail.geocodedApprox
-        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate location</span>`
-        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise location</span>`;
+      const locBadge = detail.geocodedApprox
+        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate</span>`
+        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise</span>`;
       const popupHTML = `
-        <div style="color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.45; min-width: 200px; padding: 2px;">
-          <h4 style="margin: 0 0 6px 0; font-weight: 800; color: var(--accent); font-size: 14px;">${c.name}</h4>
-          <div style="font-size: 11px; color: var(--text3); font-weight: 700; margin-bottom: 4px;">CODE: ${c.code}</div>
-          <div style="margin-bottom: 4px;">
-            <span class="map-rating-stars">${stars}</span>
-            ${hasRatingG ? `<span style="color: var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>` : ''}
+        <div style="color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.45;min-width:200px;padding:2px;">
+          <h4 style="margin:0 0 6px 0;font-weight:800;color:var(--accent);font-size:14px;">${c.name}</h4>
+          <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">CODE: ${c.code}</div>
+          <div style="margin-bottom:4px;"><span class="map-rating-stars">${stars}</span>${hasRatingG?`<span style="color:var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>`:''}</div>
+          <div style="margin-bottom:6px;">${locBadge}</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">${detail.address}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name+' '+detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0;">🗺️ Google Maps</a>
+            <button onclick="selectCollegeFromMap('${c.code}')" class="map-btn-select" style="margin-top:0;">🔍 Select</button>
           </div>
-          <div style="margin-bottom: 6px;">${locBadgeG}</div>
-          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px;">${detail.address}</div>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0;">
-              🗺️ Google Maps
-            </a>
-            <button onclick="selectCollegeFromMap('${c.code}')" class="map-btn-select" style="margin-top:0;">
-              🔍 Select
-            </button>
-          </div>
-        </div>
-      `;
-
-      const infowindow = new google.maps.InfoWindow({
-        content: popupHTML
-      });
-
-      marker.addListener("click", () => {
+        </div>`;
+      const infowindow = new google.maps.InfoWindow({ content: popupHTML });
+      marker.addListener('click', () => {
         if (currentInfoWindow) currentInfoWindow.close();
-        infowindow.open({
-          anchor: marker,
-          map: googleMapInstance
-        });
+        infowindow.open({ anchor: marker, map: googleMapInstance });
         currentInfoWindow = infowindow;
       });
-
       googleMarkers[c.code] = { marker, infowindow };
     }
   });
-
-  const mappedCount = Object.keys(googleMarkers).length;
-  document.getElementById('map-status').textContent = `Showing all ${mappedCount} colleges (Google Maps)`;
+  document.getElementById('map-status').textContent = `Showing all ${Object.keys(googleMarkers).length} colleges (Google Maps)`;
 }
 
 function initLeafletMap() {
   isGoogleMap = false;
   const mapDiv = document.getElementById('map');
   if (!mapDiv) return;
-
   mapDiv.innerHTML = '';
-
   leafletMapInstance = L.map('map').setView([17.3850, 78.4867], 9);
-  
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -1462,38 +1900,28 @@ function initLeafletMap() {
     if (detail && detail.lat && detail.lon && detail.geocoded) {
       const hasRatingL = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
       const stars = hasRatingL ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating';
-      const locBadgeL = detail.geocodedApprox
-        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate location</span>`
-        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise location</span>`;
+      const locBadge = detail.geocodedApprox
+        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate</span>`
+        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise</span>`;
       const popupHTML = `
-        <div style="min-width: 200px;">
+        <div style="min-width:190px;">
           <h4>${c.name}</h4>
-          <div style="font-size: 11px; color: var(--text3); font-weight: 700; margin-bottom: 4px;">CODE: ${c.code}</div>
-          <div style="margin-bottom: 4px;">
-            <span class="map-rating-stars">${stars}</span>
-            ${hasRatingL ? `<span style="color: var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>` : ''}
+          <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">CODE: ${c.code}</div>
+          <div style="margin-bottom:4px;"><span class="map-rating-stars">${stars}</span>${hasRatingL?`<span style="color:var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>`:''}</div>
+          <div style="margin-bottom:6px;">${locBadge}</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.3;">${detail.address}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name+' '+detail.address)}" target="_blank" class="map-btn-gmaps">🗺️ Google Maps</a>
+            <button onclick="selectCollegeFromMap('${c.code}')" class="map-btn-select">🔍 Select</button>
           </div>
-          <div style="margin-bottom: 6px;">${locBadgeL}</div>
-          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.3;">${detail.address}</div>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps">
-              🗺️ Google Maps
-            </a>
-            <button onclick="selectCollegeFromMap('${c.code}')" class="map-btn-select">
-              🔍 Select
-            </button>
-          </div>
-        </div>
-      `;
+        </div>`;
       const marker = L.marker([detail.lat, detail.lon]);
       marker.bindPopup(popupHTML);
       marker.addTo(leafletMapInstance);
       leafletMarkers[c.code] = marker;
     }
   });
-
-  const mappedCount = Object.keys(leafletMarkers).length;
-  document.getElementById('map-status').textContent = `Showing all ${mappedCount} colleges (OpenStreetMap)`;
+  document.getElementById('map-status').textContent = `Showing all ${Object.keys(leafletMarkers).length} colleges (OpenStreetMap)`;
 }
 
 window.selectCollegeFromMap = function(code) {
@@ -1502,6 +1930,7 @@ window.selectCollegeFromMap = function(code) {
     sel.value = code;
     applyFilters();
     document.getElementById('map-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast('📍 College selected from map');
   }
 };
 
@@ -1509,18 +1938,9 @@ window.resetMapView = function() {
   if (isGoogleMap && googleMapInstance) {
     const bounds = new google.maps.LatLngBounds();
     let hasMarkers = false;
-    Object.values(googleMarkers).forEach(m => {
-      if (m.marker.getMap()) {
-        bounds.extend(m.marker.getPosition());
-        hasMarkers = true;
-      }
-    });
-    if (hasMarkers) {
-      googleMapInstance.fitBounds(bounds);
-    } else {
-      googleMapInstance.setCenter({ lat: 17.3850, lng: 78.4867 });
-      googleMapInstance.setZoom(9);
-    }
+    Object.values(googleMarkers).forEach(m => { if (m.marker.getMap()) { bounds.extend(m.marker.getPosition()); hasMarkers = true; } });
+    if (hasMarkers) googleMapInstance.fitBounds(bounds);
+    else { googleMapInstance.setCenter({ lat:17.3850, lng:78.4867 }); googleMapInstance.setZoom(9); }
     document.getElementById('map-status').textContent = `Showing all ${Object.keys(googleMarkers).length} colleges`;
   } else if (!isGoogleMap && leafletMapInstance) {
     const visibleMarkers = Object.values(leafletMarkers).filter(m => leafletMapInstance.hasLayer(m));
@@ -1537,9 +1957,7 @@ window.resetMapView = function() {
 window.selectCollege = function(code, year) {
   switchTab('explore');
   document.getElementById('filterCollege').value = code;
-  if (year) {
-    document.getElementById('filterYear').value = year;
-  }
+  if (year) document.getElementById('filterYear').value = year;
   applyFilters();
   setTimeout(() => {
     const studentSec = document.getElementById('studentSection');
@@ -1549,7 +1967,6 @@ window.selectCollege = function(code, year) {
   }, 300);
 };
 
-// Highlight a single branch campus on the map and zoom to it
 window.highlightBranchOnMap = function(code) {
   if (isGoogleMap && googleMapInstance) {
     const mObj = googleMarkers[code];
@@ -1571,23 +1988,13 @@ window.highlightBranchOnMap = function(code) {
   }
 };
 
-// Highlight all campus pins of a group on the map (zoom to fit all)
 window.highlightGroupOnMap = function(codes) {
   if (isGoogleMap && googleMapInstance) {
     const bounds = new google.maps.LatLngBounds();
     let count = 0;
-    codes.forEach(code => {
-      const mObj = googleMarkers[code];
-      if (mObj) { bounds.extend(mObj.marker.getPosition()); count++; }
-    });
-    if (count > 1) {
-      googleMapInstance.fitBounds(bounds, { padding: 60 });
-    } else if (count === 1) {
-      codes.forEach(code => {
-        const mObj = googleMarkers[code];
-        if (mObj) { googleMapInstance.panTo(mObj.marker.getPosition()); googleMapInstance.setZoom(15); }
-      });
-    }
+    codes.forEach(code => { const mObj = googleMarkers[code]; if (mObj) { bounds.extend(mObj.marker.getPosition()); count++; } });
+    if (count > 1) googleMapInstance.fitBounds(bounds, { padding: 60 });
+    else if (count === 1) codes.forEach(code => { const mObj = googleMarkers[code]; if (mObj) { googleMapInstance.panTo(mObj.marker.getPosition()); googleMapInstance.setZoom(15); } });
   } else if (!isGoogleMap && leafletMapInstance) {
     const validMarkers = codes.map(c => leafletMarkers[c]).filter(Boolean);
     if (validMarkers.length > 1) {
@@ -1598,160 +2005,453 @@ window.highlightGroupOnMap = function(codes) {
     }
   }
 };
+
+// ==========================================
+// AYSH AI ASSISTANT LOGIC & INTEGRATION
+// ==========================================
+let aiChatHistoryData = [];
+let aiMapSearchMarker = null;
+let aiMapPolylines = [];
+
+function adjustAiTextareaHeight() {
+  const textarea = document.getElementById('aiTextarea');
+  if (!textarea) return;
+  textarea.style.height = '48px'; // reset
+  textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+}
+
+function handleAiTextareaKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendAiMessage();
+  }
+}
+
+function setAiQuery(query) {
+  const textarea = document.getElementById('aiTextarea');
+  if (!textarea) return;
+  textarea.value = query;
+  adjustAiTextareaHeight();
+  sendAiMessage();
+}
+
+function parseMarkdownTables(text) {
+  const lines = text.split('\n');
+  let inTable = false;
+  let tableRows = [];
+  let resultLines = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('|') && line.endsWith('|')) {
+      inTable = true;
+      if (line.match(/^\|[\s:-|]+$/)) {
+        continue;
+      }
+      const cells = line
+        .split('|')
+        .map(c => c.trim())
+        .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+      tableRows.push(cells);
+    } else {
+      if (inTable) {
+        resultLines.push(renderHtmlTable(tableRows));
+        tableRows = [];
+        inTable = false;
+      }
+      resultLines.push(lines[i]);
+    }
+  }
+  if (inTable && tableRows.length > 0) {
+    resultLines.push(renderHtmlTable(tableRows));
+  }
+  return resultLines.join('\n');
+}
+
+function renderHtmlTable(rows) {
+  if (rows.length === 0) return '';
+  let html = '<div class="table-wrap" style="margin:12px 0;max-width:100%;border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow);border:1px solid rgba(255,255,255,0.15);"><div class="table-scroll"><table style="width:100%;border-collapse:collapse;font-size:12.5px;background:rgba(0,0,0,0.45);">';
+  html += '<thead><tr style="background:rgba(255,255,255,0.08);border-bottom:2px solid rgba(255,255,255,0.25);">';
+  rows[0].forEach(cell => {
+    html += `<th style="padding:10px 12px;font-weight:700;text-align:left;color:#ffffff;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;">${cell}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  for (let i = 1; i < rows.length; i++) {
+    html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.08);">';
+    rows[i].forEach(cell => {
+      html += `<td style="padding:10px 12px;color:#f8fafc;font-weight:500;">${cell}</td>`;
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function addAiChatBubble(role, text) {
+  const chatHistory = document.getElementById('aiChatHistory');
+  const welcomeView = document.getElementById('aiWelcomeView');
+  
+  if (welcomeView && welcomeView.style.display !== 'none') {
+    welcomeView.style.display = 'none';
+  }
+  if (chatHistory && chatHistory.style.display === 'none') {
+    chatHistory.style.display = 'flex';
+  }
+  
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${role}`;
+  
+  if (role === 'ai') {
+    // 1. Safe Escape
+    let html = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+      
+    // 2. Restore safe custom elements (buttons and anchor links)
+    html = html.replace(/&lt;button (.*?)&gt;(.*?)&lt;\/button&gt;/g, (match, attrs, content) => {
+      const cleanAttrs = attrs.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+      return `<button ${cleanAttrs}>${content}</button>`;
+    });
+    // Restore <a href="..."> anchor tags for Google Maps links
+    html = html.replace(/&lt;a (.*?)&gt;(.*?)&lt;\/a&gt;/gs, (match, attrs, content) => {
+      const cleanAttrs = attrs.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+      return `<a ${cleanAttrs}>${content.trim()}</a>`;
+    });
+
+    // 3. Render Markdown Tables
+    html = parseMarkdownTables(html);
+
+    // 4. Render standard Markdown formatting
+    html = html
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    
+    // 5. Render Lists
+    if (html.includes('- ')) {
+      html = html.split('<br>').map(line => {
+        if (line.trim().startsWith('- ')) {
+          return `<li>${line.trim().substring(2)}</li>`;
+        }
+        return line;
+      }).join('<br>');
+      html = html.replace(/(<li>.*?<\/li>)/g, '<ul>$1</ul>').replace(/<\/ul><br><ul>/g, '');
+    }
+    
+    bubble.innerHTML = `<p>${html}</p>`;
+  } else {
+    bubble.textContent = text;
+  }
+  
+  chatHistory.appendChild(bubble);
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function clearAiMapFeatures() {
+  if (isGoogleMap && googleMapInstance) {
+    if (aiMapSearchMarker) { aiMapSearchMarker.setMap(null); aiMapSearchMarker = null; }
+    aiMapPolylines.forEach(p => p.setMap(null));
+    aiMapPolylines = [];
+  } else if (!isGoogleMap && leafletMapInstance) {
+    if (aiMapSearchMarker) { leafletMapInstance.removeLayer(aiMapSearchMarker); aiMapSearchMarker = null; }
+    aiMapPolylines.forEach(p => leafletMapInstance.removeLayer(p));
+    aiMapPolylines = [];
+  }
+}
+
+function extractAreaKeyword(query) {
+  const regexes = [
+    /near\s+([a-zA-Z0-9\s]+)/i,
+    /around\s+([a-zA-Z0-9\s]+)/i,
+    /in\s+([a-zA-Z0-9\s]+)/i,
+    /at\s+([a-zA-Z0-9\s]+)/i,
+    /colleges\s+of\s+([a-zA-Z0-9\s]+)/i
+  ];
+  for (const regex of regexes) {
+    const match = query.match(regex);
+    if (match && match[1]) {
+      const area = match[1].trim();
+      return area.replace(/\b(colleges|college|engineering|map|show|me|find|the|distance|between|and|here)\b/gi, '').trim();
+    }
+  }
+  return null;
+}
+
+async function geocodeArea(areaName) {
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(areaName + ', Telangana, India')}&format=json&limit=1`, {
+      headers: { 'Accept-Language': 'en' }
+    });
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+  } catch (error) {
+    console.warn('Geocoding service error. Scanning offline addresses database.', error);
+  }
+  
+  // Offline Address Matcher Fallback
+  for (const code in collegesDetails) {
+    const c = collegesDetails[code];
+    if (c.address && c.address.toLowerCase().includes(areaName.toLowerCase()) && c.lat && c.lon) {
+      return { lat: c.lat, lon: c.lon };
+    }
+  }
+  return null;
+}
+
+async function sendAiMessage() {
+  const textarea = document.getElementById('aiTextarea');
+  const sendBtn = document.getElementById('aiSendBtn');
+  const thinkingText = document.getElementById('aiThinkingText');
+  const siriGlow = document.getElementById('siriGlow');
+  const inputContainer = document.getElementById('aiInputContainer');
+  const welcomeView = document.getElementById('aiWelcomeView');
+  
+  const message = textarea.value.trim();
+  if (!message) return;
+  
+  textarea.value = '';
+  textarea.style.height = '48px';
+  
+  addAiChatBubble('user', message);
+  
+  if (welcomeView && welcomeView.style.display !== 'none') {
+    welcomeView.style.display = 'none';
+  }
+  if (siriGlow) {
+    siriGlow.style.display = 'flex';
+    const chatHistory = document.getElementById('aiChatHistory');
+    if (chatHistory) {
+      chatHistory.after(siriGlow);
+    }
+  }
+  if (thinkingText) thinkingText.style.display = 'flex';
+  if (sendBtn) sendBtn.disabled = true;
+  if (inputContainer) inputContainer.classList.add('siri-active');
+  
+  let locationContext = "";
+  let ratingContext = "";
+  let rankContext = "";
+  
+  // Geolocation check
+  const areaKeyword = extractAreaKeyword(message);
+  if (areaKeyword && areaKeyword.length > 2) {
+    showToast(`🔍 Searching map coordinates for "${areaKeyword}"...`);
+    const coords = await geocodeArea(areaKeyword);
+    
+    if (coords) {
+      clearAiMapFeatures();
+      
+      const collegesWithDistance = [];
+      for (const code in collegesDetails) {
+        const detail = collegesDetails[code];
+        if (detail && detail.lat && detail.lon && detail.geocoded) {
+          const dist = calculateDistance(coords.lat, coords.lon, detail.lat, detail.lon);
+          const colObj = colleges.find(c => c.code === code);
+          const name = colObj ? colObj.name : code;
+          collegesWithDistance.push({
+            code,
+            name,
+            lat: detail.lat,
+            lon: detail.lon,
+            distance: dist,
+            rating: detail.rating,
+            address: detail.address
+          });
+        }
+      }
+      
+      collegesWithDistance.sort((a, b) => a.distance - b.distance);
+      // Show ALL nearby colleges up to 10 km, or nearest 10 whichever is more useful
+      const nearestColleges = collegesWithDistance.slice(0, 10);
+
+      // Compute pairwise distances between the top 5 nearest colleges
+      const topFive = nearestColleges.slice(0, 5);
+      let pairwiseDistancesText = "";
+      for (let i = 0; i < topFive.length; i++) {
+        for (let j = i + 1; j < topFive.length; j++) {
+          const c1 = topFive[i];
+          const c2 = topFive[j];
+          const dist = calculateDistance(c1.lat, c1.lon, c2.lat, c2.lon);
+          pairwiseDistancesText += `- Distance between ${c1.name} (${c1.code}) and ${c2.name} (${c2.code}): ${dist.toFixed(2)} km\n`;
+        }
+      }
+
+      // Build Google Maps search URL for each college
+      nearestColleges.forEach(col => {
+        col.gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(col.name + ' ' + col.address)}`;
+      });
+
+      showToast(`📍 Found ${nearestColleges.length} colleges near "${areaKeyword}"`);
+
+      locationContext =
+        `The user is searching for colleges near "${areaKeyword}" (geocoded: lat ${coords.lat}, lon ${coords.lon}).\n` +
+        `Here are the nearest engineering colleges with exact distances from ${areaKeyword}:\n` +
+        nearestColleges.map((c, idx) =>
+          `${idx + 1}. ${c.name} (${c.code}) — ${c.distance.toFixed(2)} km | Rating: ${c.rating || 'N/A'} | Google Maps Link: ${c.gmapsUrl}`
+        ).join('\n') +
+        `\n\nPairwise distances between the closest colleges:\n` +
+        pairwiseDistancesText +
+        `\n\nInstructions for your response:
+- Output a Markdown table listing these nearest colleges and their distances from ${areaKeyword}. The table columns must be: No., College Name, Code, Distance from Location, Rating, View on Google Map.
+- In the "View on Google Map" column, for each college use this EXACT HTML anchor (replace URL with the real Google Maps Link from above, keep style exactly):
+  <a href="URL" target="_blank" rel="noopener" style="display:inline-block;padding:4px 10px;background:#16a34a;color:#fff;border-radius:5px;text-decoration:none;font-size:10px;font-weight:700;white-space:nowrap;">🗺️ Google Maps</a>
+- Do NOT invent or guess any URLs; use only the URLs provided above. Do NOT use placeholder URLs like example.com.
+- After the table, add a section displaying the pairwise distances between the colleges themselves (distance between them).
+- Mention the searched location name in your response.`;
+    } else {
+      locationContext = `The user searched for colleges near "${areaKeyword}", but the location could not be geocoded. Ask the user to try a more specific or popular landmark name.`;
+    }
+  }
+  
+  // Ratings check
+  if (message.toLowerCase().match(/\b(rating|rated|best|top|stars)\b/)) {
+    const list = [];
+    for (const code in collegesDetails) {
+      const details = collegesDetails[code];
+      if (details && details.rating && details.rating >= 4.0) {
+        const col = colleges.find(c => c.code === code);
+        list.push({
+          code,
+          name: col ? col.name : code,
+          rating: details.rating,
+          address: details.address
+        });
+      }
+    }
+    list.sort((a, b) => b.rating - a.rating);
+    const topRated = list.slice(0, 10);
+    ratingContext = `Here are the top-rated colleges from our database (highest Collegedunia ratings):\n` +
+      topRated.map(c => `- ${c.name} (${c.code}): ${c.rating} stars - Location: ${c.address}`).join('\n');
+  }
+  
+  // Rank check
+  const numberMatches = message.match(/\b\d{3,6}\b/g);
+  if (numberMatches) {
+    // Detect a year mentioned in the message (e.g. 2025, 2024)
+    const yearMatch = message.match(/\b(20\d{2})\b/);
+    const targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
+
+    const ranksToCheck = numberMatches.map(Number).filter(n => n > 50 && n < 200000);
+    if (ranksToCheck.length > 0) {
+      const userRank = ranksToCheck[0];
+      // Buffer: closing rank within 15000 above the user's rank
+      let matchingAllotments = allData.filter(r =>
+        r.closing_rank >= userRank && r.closing_rank <= userRank + 15000
+      );
+
+      // Apply year filter if user mentioned one
+      if (targetYear) {
+        const yearFiltered = matchingAllotments.filter(r => {
+          const y = typeof r.year === 'string'
+            ? parseInt(r.year.replace(/[^0-9]/g, '').slice(-4))
+            : r.year;
+          return y === targetYear;
+        });
+        // Fall back to all years if the year filter yields nothing
+        if (yearFiltered.length > 0) matchingAllotments = yearFiltered;
+      }
+
+      // De-duplicate by college code, keeping the record with lowest closing rank
+      const uniqColleges = {};
+      matchingAllotments.forEach(item => {
+        const key = item.college_code;
+        if (!uniqColleges[key] || item.closing_rank < uniqColleges[key].closing_rank) {
+          uniqColleges[key] = item;
+        }
+      });
+
+      // Sort by closing rank ascending
+      const recommendations = Object.values(uniqColleges)
+        .sort((a, b) => a.closing_rank - b.closing_rank)
+        .slice(0, 12);
+
+      if (recommendations.length > 0) {
+        const yearLabel = targetYear ? ` (${targetYear} data)` : ' (all years)';
+        rankContext = `The user has an EAPCET Rank of ${userRank}. Colleges where closing rank is within range${yearLabel}:\n` +
+          recommendations.map(r => {
+            return `- ${r.college_name} (${r.college_code}): Opening Rank ${r.opening_rank.toLocaleString()}, Closing Rank ${r.closing_rank.toLocaleString()} | Year: ${formatYear(r.year)}`;
+          }).join('\n') +
+          `\n\nPresent this as a clean Markdown table with columns: College Name, Code, Opening Rank, Closing Rank, Year.`;
+      } else {
+        rankContext = `No colleges found in our ${targetYear ? targetYear + ' ' : ''}allotment records matching rank ${userRank}. The database may not have data for that year/rank combination. Suggest the user try a nearby rank range or different year.`;
+      }
+    }
+  }
+  
+  const fullContext = [locationContext, ratingContext, rankContext].filter(Boolean).join('\n\n');
+  
+  const systemPrompt = `You are Aysh AI, an advanced college counselor assistant for the Telangana EAPCET engineering allotments.
+You have access to a database containing allotments, ranks, ratings, and locations of engineering colleges across Telangana (from 2015 to 2025).
+
+Here is the relevant real-time context extracted directly from our local database for the user's question:
+=========================================
+${fullContext || "No specific database matches found. General helper guidance applies."}
+=========================================
+
+Critical Guidelines:
+1. Identify yourself ONLY as Aysh AI. Never refer to yourself as OpenRouter, Llama, Gemini, or any other underlying model.
+2. Provide detailed, comprehensive, and larger responses with rich advice, analysis, explanation of ranks, and details on colleges to give maximum value. Make your responses longer and highly informative.
+3. For tabular data, use standard Markdown tables (using | columns).
+4. Do NOT output any inline map buttons (no `<button onclick="window.highlightBranchOnMap...">` elements).
+5. For Google Maps links in location queries, you MUST use the exact HTML anchor tags with the actual URLs provided in the context. Never use placeholder links or example.com. For other queries, if you want to provide a Google Maps search link, use: `<a href="https://www.google.com/maps/search/?api=1&query=COLLEGE_NAME+COLLEGE_ADDRESS" target="_blank" rel="noopener" style="display:inline-block;padding:4px 10px;background:#16a34a;color:#fff;border-radius:5px;text-decoration:none;font-size:10px;font-weight:700;white-space:nowrap;">🗺️ Google Maps</a>` substituting the college's name and address.`;
+
+  aiChatHistoryData.push({ role: 'user', content: message });
+  
+  try {
+    const openRouterApiKey = '';
+    const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(openRouterApiKey ? { 'Authorization': `Bearer ${openRouterApiKey}` } : {}),
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'Aysh AI Counselor'
+      },
+      body: JSON.stringify({
+        model: 'openrouter/free',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...aiChatHistoryData.slice(-6)
+        ]
+      })
+    });
+    
+    if (!apiResponse.ok) {
+      throw new Error(`API error: ${apiResponse.status} ${apiResponse.statusText}`);
+    }
+    
+    const responseJson = await apiResponse.json();
+    const aiResponseText = responseJson.choices[0].message.content;
+    
+    aiChatHistoryData.push({ role: 'assistant', content: aiResponseText });
+    addAiChatBubble('ai', aiResponseText);
+    
+  } catch (error) {
+    console.error('OpenRouter fetch failed:', error);
+    addAiChatBubble('ai', `⚠️ **Error connecting to Aysh AI**: ${error.message}. Please verify your internet connection or key status.`);
+  } finally {
+    if (siriGlow) siriGlow.style.display = 'none';
+    if (thinkingText) thinkingText.style.display = 'none';
+    if (sendBtn) sendBtn.disabled = false;
+    if (inputContainer) inputContainer.classList.remove('siri-active');
+  }
+}
 </script>
-
-<!-- FOOTER -->
-<footer style="
-  position: relative; z-index: 1;
-  text-align: center;
-  padding: 28px 20px;
-  margin-top: 40px;
-  border-top: 1px solid var(--border);
-  background: linear-gradient(180deg, transparent 0%, rgba(232,96,154,0.04) 100%);
-">
-  <p style="
-    color: var(--text3);
-    font-size: 14px;
-    font-weight: 500;
-    font-family: 'Inter', sans-serif;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-  ">
-    Made by Love for&nbsp;<span style="
-      font-weight: 800;
-      background: linear-gradient(135deg, #be185d, #db2777, #c026d3);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-size: 15px;
-      letter-spacing: 1px;
-    ">13</span>&nbsp;By&nbsp;<span style="
-      font-weight: 800;
-      background: linear-gradient(135deg, #be185d, #db2777, #c026d3);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-size: 15px;
-      letter-spacing: 1px;
-    ">11</span>&nbsp;<span id="heartIcon" style="
-      display: inline-block;
-      font-size: 18px;
-      animation: heartbeat 1.2s ease-in-out infinite;
-      filter: drop-shadow(0 0 6px rgba(219,39,119,0.7));
-    ">❤️</span>
-  </p>
-</footer>
-
-<style>
-  @keyframes heartbeat {
-    0%   { transform: scale(1); }
-    14%  { transform: scale(1.25); }
-    28%  { transform: scale(1); }
-    42%  { transform: scale(1.15); }
-    70%  { transform: scale(1); }
-    100% { transform: scale(1); }
-  }
-
-  /* ========= STUDENT SECTION ========= */
-  .section-divider {
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
-    margin: 40px 0 32px;
-    border-radius: 2px;
-    opacity: 0.4;
-  }
-  .section-header {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    flex-wrap: wrap; gap: 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 24px 28px;
-    margin-bottom: 16px;
-    position: relative; overflow: hidden;
-  }
-  .section-header::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(219,39,119,0.06) 0%, transparent 60%);
-    pointer-events: none;
-  }
-  .section-header-left { display: flex; align-items: center; gap: 16px; }
-  .section-icon {
-    font-size: 32px;
-    background: rgba(219,39,119,0.10);
-    border: 1px solid rgba(219,39,119,0.2);
-    border-radius: 14px; width: 56px; height: 56px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .section-title {
-    font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 4px;
-    background: linear-gradient(135deg, #be185d 0%, #db2777 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .section-subtitle { font-size: 12px; color: var(--text3); letter-spacing: 0.3px; }
-  .section-header-right { display: flex; align-items: center; }
-
-  /* Stats grid */
-  .sec-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-  .sec-stat-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 18px 20px;
-    text-align: center; position: relative; overflow: hidden;
-    transition: transform 0.2s, border-color 0.2s;
-  }
-  .sec-stat-card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 6px 20px rgba(219,39,119,0.12); }
-  .sec-stat-val { font-size: 26px; font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 6px; }
-  .sec-stat-lbl { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
-
-  /* Category pills */
-  .sec-categories {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 16px 20px; margin-bottom: 16px;
-  }
-  .cat-pill {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 6px 12px;
-    transition: border-color 0.2s;
-  }
-  .cat-pill:hover { border-color: var(--accent); }
-  .cat-name { font-size: 12px; font-weight: 700; color: var(--text2); }
-  .cat-count {
-    font-size: 12px; font-weight: 800;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Search row */
-  .sec-search-row {
-    display: flex; align-items: center; gap: 16px;
-    margin-bottom: 16px; flex-wrap: wrap;
-  }
-
-  /* Table header cells */
-  .sec-th {
-    background: var(--surface2); padding: 12px 14px;
-    text-align: left; font-size: 11px; font-weight: 700;
-    color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px;
-    border-bottom: 1px solid var(--border); white-space: nowrap;
-  }
-
-  /* Student rows */
-  .student-row { border-bottom: 1px solid rgba(249,168,212,0.45); transition: background 0.15s; }
-  .student-row:hover { background: rgba(219,39,119,0.04); }
-  .std-td { padding: 12px 14px; vertical-align: middle; }
-  .cat-badge {
-    background: rgba(219,39,119,0.08); color: var(--accent);
-    border: 1px solid rgba(219,39,119,0.18);
-    border-radius: 6px; padding: 3px 10px;
-    font-size: 11px; font-weight: 700;
-  }
-</style>
-
 </body>
 </html>
