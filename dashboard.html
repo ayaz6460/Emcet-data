@@ -259,6 +259,24 @@
   }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.6;transform:scale(1.3);} }
 
+  /* SEARCH BUTTON */
+  .rank-search-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 28px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700; font-family: inherit;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 4px 18px rgba(219,39,119,0.30);
+    white-space: nowrap;
+  }
+  .rank-search-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(219,39,119,0.45);
+  }
+  .rank-search-btn:active { transform: translateY(0); }
+  .rank-search-btn.loading { opacity: 0.7; pointer-events: none; }
+
   /* CHART AREA */
   .chart-card {
     background: var(--surface); border: 1px solid var(--border);
@@ -591,26 +609,33 @@
   <div class="panel" id="panel-finder">
     <div class="rank-input-card">
       <h3>🎯 Find Colleges for Your Rank</h3>
-      <p>Enter your EAPCET rank to see which colleges you qualify for across selected year and phase</p>
+      <p>Enter your EAPCET rank, choose filters, then click <strong>Search Colleges</strong></p>
       <div class="rank-input-row">
         <div>
           <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;display:block;margin-bottom:6px;">Your Rank</label>
-          <input type="number" class="rank-big-input" id="myRank" placeholder="e.g. 25000" min="1" max="300000" oninput="findColleges()">
+          <input type="number" class="rank-big-input" id="myRank" placeholder="e.g. 25000" min="1" max="300000"
+            onkeydown="if(event.key==='Enter') findColleges()">
         </div>
         <div class="filter-group" style="max-width:200px;">
           <label>Year / Phase</label>
-          <select id="finderYear" onchange="findColleges()">
+          <select id="finderYear">
             <option value="">All Years</option>
           </select>
         </div>
         <div class="filter-group" style="max-width:200px;">
           <label>Max Opening Rank Buffer</label>
-          <select id="finderBuffer" onchange="findColleges()">
-            <option value="0">Exact (≤ Closing Rank)</option>
-            <option value="5000" selected>±5,000 rank buffer</option>
-            <option value="10000">±10,000 rank buffer</option>
-            <option value="20000">±20,000 rank buffer</option>
+          <select id="finderBuffer">
+            <option value="0">Exact (&le; Closing Rank)</option>
+            <option value="5000" selected>&plusmn;5,000 rank buffer</option>
+            <option value="10000">&plusmn;10,000 rank buffer</option>
+            <option value="20000">&plusmn;20,000 rank buffer</option>
           </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:transparent;display:block;margin-bottom:6px;">Search</label>
+          <button class="rank-search-btn" id="searchBtn" onclick="findColleges()">
+            🔍 Search Colleges
+          </button>
         </div>
         <div class="match-indicator" id="matchIndicator" style="display:none;">
           <div class="dot"></div>
@@ -939,6 +964,7 @@ function findColleges() {
   const buffer = parseInt(document.getElementById('finderBuffer').value, 10) || 0;
   const tbody = document.getElementById('finderBody');
   const indicator = document.getElementById('matchIndicator');
+  const btn = document.getElementById('searchBtn');
 
   if (!rankVal || rankVal < 1) {
     indicator.style.display = 'none';
@@ -948,52 +974,61 @@ function findColleges() {
     return;
   }
 
-  let matched = allData.filter(r => {
-    if (year && r.year !== year) return false;
-    // Qualify if rank <= closing_rank + buffer
-    return rankVal <= (r.closing_rank + buffer);
-  });
+  // Show loading state on button
+  if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ Searching…'; }
 
-  matched.sort((a, b) => a.opening_rank - b.opening_rank);
+  // Allow browser to paint loading state before heavy work
+  setTimeout(() => {
+    let matched = allData.filter(r => {
+      if (year && r.year !== year) return false;
+      return rankVal <= (r.closing_rank + buffer);
+    });
 
-  indicator.style.display = 'flex';
-  document.getElementById('matchCount').textContent = `${matched.length} colleges found`;
+    matched.sort((a, b) => a.opening_rank - b.opening_rank);
 
-  if (matched.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8">
-      <div class="empty-state"><div class="icon">😔</div><h3>No colleges found</h3><p>Try increasing the rank buffer or selecting a different year</p></div>
-    </td></tr>`;
-    return;
-  }
+    indicator.style.display = 'flex';
+    document.getElementById('matchCount').textContent = `${matched.length} colleges found`;
 
-  tbody.innerHTML = matched.map((r, i) => {
-    const inRange = rankVal >= r.opening_rank && rankVal <= r.closing_rank;
-    const aboveOpen = rankVal < r.opening_rank;
-    let statusBadge, rowStyle = '';
-    if (aboveOpen) {
-      statusBadge = `<span class="rank-badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">⭐ Strong Chance</span>`;
-      rowStyle = 'background:rgba(16,185,129,0.03);';
-    } else if (inRange) {
-      statusBadge = `<span class="rank-badge rank-match">✅ In Range</span>`;
-      rowStyle = 'background:rgba(245,158,11,0.03);';
-    } else {
-      statusBadge = `<span class="rank-badge" style="background:rgba(239,68,68,0.10);color:#f87171;border:1px solid rgba(239,68,68,0.2);">⚠️ Marginal</span>`;
+    if (matched.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8">
+        <div class="empty-state"><div class="icon">😔</div><h3>No colleges found</h3><p>Try increasing the rank buffer or selecting a different year</p></div>
+      </td></tr>`;
+      if (btn) { btn.classList.remove('loading'); btn.innerHTML = '🔍 Search Colleges'; }
+      return;
     }
 
-    return `<tr style="${rowStyle}cursor:pointer;" onclick="selectCollege('${r.college_code}', '${r.year}')">
-      <td style="color:var(--text3);font-size:12px;">${i+1}</td>
-      <td><span class="year-tag">${formatYear(r.year)}</span></td>
-      <td><span class="college-code">${r.college_code}</span></td>
-      <td class="college-name" title="${r.college_name}">
-        ${truncate(r.college_name, 50)}
-        ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size: 11px; white-space: nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
-      </td>
-      <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
-      <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
-      <td>${statusBadge}</td>
-      <td><span class="students-pill">${r.total_students}</span></td>
-    </tr>`;
-  }).join('');
+    tbody.innerHTML = matched.map((r, i) => {
+      const inRange = rankVal >= r.opening_rank && rankVal <= r.closing_rank;
+      const aboveOpen = rankVal < r.opening_rank;
+      let statusBadge, rowStyle = '';
+      if (aboveOpen) {
+        statusBadge = `<span class="rank-badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">⭐ Strong Chance</span>`;
+        rowStyle = 'background:rgba(16,185,129,0.03);';
+      } else if (inRange) {
+        statusBadge = `<span class="rank-badge rank-match">✅ In Range</span>`;
+        rowStyle = 'background:rgba(245,158,11,0.03);';
+      } else {
+        statusBadge = `<span class="rank-badge" style="background:rgba(239,68,68,0.10);color:#f87171;border:1px solid rgba(239,68,68,0.2);">⚠️ Marginal</span>`;
+      }
+
+      return `<tr style="${rowStyle}cursor:pointer;" onclick="selectCollege('${r.college_code}', '${r.year}')">
+        <td style="color:var(--text3);font-size:12px;">${i+1}</td>
+        <td><span class="year-tag">${formatYear(r.year)}</span></td>
+        <td><span class="college-code">${r.college_code}</span></td>
+        <td class="college-name" title="${r.college_name}">
+          ${truncate(r.college_name, 50)}
+          ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size: 11px; white-space: nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
+        </td>
+        <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
+        <td><span class="rank-badge rank-close">🔴 ${r.closing_rank.toLocaleString()}</span></td>
+        <td>${statusBadge}</td>
+        <td><span class="students-pill">${r.total_students}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Restore button
+    if (btn) { btn.classList.remove('loading'); btn.innerHTML = '🔍 Search Colleges'; }
+  }, 30);
 }
 
 function renderTrends() {
