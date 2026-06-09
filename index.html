@@ -682,6 +682,8 @@ let map = null;
 let markers = {};
 
 // Load data
+let collegeGroups = { codeToGroup: {}, groupMap: {} };
+
 Promise.all([
   fetch('dashboard_data.json').then(r => r.json()),
   fetch('colleges_details.json')
@@ -689,13 +691,17 @@ Promise.all([
     .catch(e => {
       console.warn('Could not load colleges_details.json, using fallback.', e);
       return {};
-    })
+    }),
+  fetch('college_groups.json')
+    .then(r => r.json())
+    .catch(() => ({ codeToGroup: {}, groupMap: {} }))
 ])
-  .then(([json, details]) => {
+  .then(([json, details, groups]) => {
     allData = json.data;
     years = json.years;
     colleges = json.colleges;
     collegesDetails = details;
+    collegeGroups = groups;
     init();
     initMap();
   })
@@ -878,7 +884,7 @@ function renderTable() {
       <td><span class="year-tag">${formatYear(r.year)}</span></td>
       <td><span class="college-code">${r.college_code}</span></td>
       <td class="college-name" title="${r.college_name}">
-        ${truncate(r.college_name, 55)}
+        ${truncate(r.college_name, 52)}
         ${collegesDetails[r.college_code] && collegesDetails[r.college_code].rating ? ` <span class="map-rating-stars" style="font-size: 11px; white-space: nowrap;">⭐${collegesDetails[r.college_code].rating}</span>` : ''}
       </td>
       <td><span class="rank-badge rank-open">🟢 ${r.opening_rank.toLocaleString()}</span></td>
@@ -1085,8 +1091,8 @@ async function loadStudentSection(year, code, name) {
       <div style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--text2); margin-top:6px;">
         <span>📍 ${detail.address}</span>
         <span style="display:inline-flex; align-items:center; gap:6px; margin-top:2px; flex-wrap: wrap;">
-          <span style="color:var(--accent4); font-weight:700;">${stars}</span> 
-          ${hasRating ? `<span style="color:var(--text3);">(${(detail.reviews||0).toLocaleString()} reviews · Collegedunia)</span>` : ''}
+          <span style="color:var(--accent4); font-weight:700;">${stars}</span>
+          ${hasRating ? `<span style="color:var(--text3);">(${(detail.reviews||0).toLocaleString()} reviews &middot; Collegedunia)</span>` : ''}
           <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0; padding:4px 8px; font-size:10px; margin-left:8px; line-height:1;">
             🗺️ View on Google Maps
           </a>
@@ -1096,6 +1102,50 @@ async function loadStudentSection(year, code, name) {
   } else {
     document.getElementById('secSubtitle').textContent =
       `${formatYear(year)}  \u00b7  CSE Branch  \u00b7  Code: ${code}`;
+  }
+
+  // === BRANCH CAMPUSES PANEL ===
+  const brand = collegeGroups.codeToGroup?.[code];
+  const branchPanel = document.getElementById('branchPanel') || (() => {
+    const p = document.createElement('div');
+    p.id = 'branchPanel';
+    document.getElementById('secSubtitle').parentElement.insertAdjacentElement('afterend', p);
+    return p;
+  })();
+
+  if (brand && collegeGroups.groupMap?.[brand]) {
+    const siblings = collegeGroups.groupMap[brand].filter(b => b.code !== code);
+    if (siblings.length > 0) {
+      branchPanel.innerHTML = `
+        <div style="margin-top:12px; padding:10px 14px; background:linear-gradient(135deg,rgba(219,39,119,0.07),rgba(192,38,211,0.07)); border:1px solid var(--border); border-radius:12px;">
+          <div style="font-size:11px; font-weight:700; color:var(--accent); letter-spacing:0.5px; margin-bottom:8px; text-transform:uppercase;">
+            🏫 ${brand} &mdash; Other Campuses (${siblings.length})
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${siblings.map(s => {
+              const sd = collegesDetails[s.code];
+              const hasPin = sd && sd.lat && sd.lon && sd.geocoded;
+              return `<button onclick="highlightBranchOnMap('${s.code}');" style="
+                background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+                padding:5px 10px; font-size:11px; cursor:pointer; color:var(--text);
+                font-family:'Inter',sans-serif; transition:all 0.2s; font-weight:500;
+                display:flex; align-items:center; gap:5px;
+              " onmouseover="this.style.background='var(--accent)';this.style.color='#fff';" onmouseout="this.style.background='var(--surface2)';this.style.color='var(--text)';">
+                ${hasPin ? '📍' : '❓'} <strong>${s.code}</strong> &mdash; ${s.name.split(' ').slice(0,4).join(' ')}
+              </button>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+      // Highlight all branches on the map
+      highlightGroupOnMap(collegeGroups.groupMap[brand].map(b => b.code));
+    } else {
+      branchPanel.innerHTML = '';
+      highlightGroupOnMap([code]);
+    }
+  } else {
+    branchPanel.innerHTML = '';
+    highlightGroupOnMap([code]);
   }
   document.getElementById('secStatsCards').innerHTML =
     '<div style="color:var(--text3);font-size:14px;padding:16px 0;">\u23F3 Loading students...</div>';
@@ -1313,15 +1363,19 @@ function initGoogleMap() {
 
       const hasRatingG = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
       const stars = hasRatingG ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating';
+      const locBadgeG = detail.geocodedApprox
+        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate location</span>`
+        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise location</span>`;
       const popupHTML = `
         <div style="color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.45; min-width: 200px; padding: 2px;">
           <h4 style="margin: 0 0 6px 0; font-weight: 800; color: var(--accent); font-size: 14px;">${c.name}</h4>
           <div style="font-size: 11px; color: var(--text3); font-weight: 700; margin-bottom: 4px;">CODE: ${c.code}</div>
-          <div style="margin-bottom: 6px;">
+          <div style="margin-bottom: 4px;">
             <span class="map-rating-stars">${stars}</span>
             ${hasRatingG ? `<span style="color: var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>` : ''}
           </div>
-          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px;">📍 ${detail.address}</div>
+          <div style="margin-bottom: 6px;">${locBadgeG}</div>
+          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px;">${detail.address}</div>
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
             <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps" style="margin-top:0;">
               🗺️ Google Maps
@@ -1373,15 +1427,19 @@ function initLeafletMap() {
     if (detail && detail.lat && detail.lon && detail.geocoded) {
       const hasRatingL = detail.rating !== null && detail.rating !== undefined && detail.rating > 0;
       const stars = hasRatingL ? ('⭐'.repeat(Math.round(detail.rating)) + ` ${detail.rating}`) : 'No rating';
+      const locBadgeL = detail.geocodedApprox
+        ? `<span style="font-size:10px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Approximate location</span>`
+        : `<span style="font-size:10px;background:#10b98122;color:#065f46;border:1px solid #10b98155;border-radius:4px;padding:1px 6px;font-weight:600;">📍 Precise location</span>`;
       const popupHTML = `
         <div style="min-width: 200px;">
           <h4>${c.name}</h4>
           <div style="font-size: 11px; color: var(--text3); font-weight: 700; margin-bottom: 4px;">CODE: ${c.code}</div>
-          <div style="margin-bottom: 6px;">
+          <div style="margin-bottom: 4px;">
             <span class="map-rating-stars">${stars}</span>
             ${hasRatingL ? `<span style="color: var(--text3);"> (${(detail.reviews||0).toLocaleString()} reviews)</span>` : ''}
           </div>
-          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.3;">📍 ${detail.address}</div>
+          <div style="margin-bottom: 6px;">${locBadgeL}</div>
+          <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.3;">${detail.address}</div>
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
             <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name + ' ' + detail.address)}" target="_blank" class="map-btn-gmaps">
               🗺️ Google Maps
@@ -1454,6 +1512,56 @@ window.selectCollege = function(code, year) {
       studentSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, 300);
+};
+
+// Highlight a single branch campus on the map and zoom to it
+window.highlightBranchOnMap = function(code) {
+  if (isGoogleMap && googleMapInstance) {
+    const mObj = googleMarkers[code];
+    if (mObj) {
+      googleMapInstance.panTo(mObj.marker.getPosition());
+      googleMapInstance.setZoom(16);
+      if (currentInfoWindow) currentInfoWindow.close();
+      mObj.infowindow.open({ anchor: mObj.marker, map: googleMapInstance });
+      currentInfoWindow = mObj.infowindow;
+      document.getElementById('map-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } else if (!isGoogleMap && leafletMapInstance) {
+    const marker = leafletMarkers[code];
+    if (marker) {
+      leafletMapInstance.setView(marker.getLatLng(), 16);
+      marker.openPopup();
+      document.getElementById('map-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+};
+
+// Highlight all campus pins of a group on the map (zoom to fit all)
+window.highlightGroupOnMap = function(codes) {
+  if (isGoogleMap && googleMapInstance) {
+    const bounds = new google.maps.LatLngBounds();
+    let count = 0;
+    codes.forEach(code => {
+      const mObj = googleMarkers[code];
+      if (mObj) { bounds.extend(mObj.marker.getPosition()); count++; }
+    });
+    if (count > 1) {
+      googleMapInstance.fitBounds(bounds, { padding: 60 });
+    } else if (count === 1) {
+      codes.forEach(code => {
+        const mObj = googleMarkers[code];
+        if (mObj) { googleMapInstance.panTo(mObj.marker.getPosition()); googleMapInstance.setZoom(15); }
+      });
+    }
+  } else if (!isGoogleMap && leafletMapInstance) {
+    const validMarkers = codes.map(c => leafletMarkers[c]).filter(Boolean);
+    if (validMarkers.length > 1) {
+      const group = new L.featureGroup(validMarkers);
+      leafletMapInstance.fitBounds(group.getBounds().pad(0.1));
+    } else if (validMarkers.length === 1) {
+      leafletMapInstance.setView(validMarkers[0].getLatLng(), 15);
+    }
+  }
 };
 </script>
 

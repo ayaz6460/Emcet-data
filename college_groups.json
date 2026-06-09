@@ -1,0 +1,319 @@
+{
+  "codeToGroup": {
+    "MRCE": "Malla Reddy",
+    "MREW": "Malla Reddy",
+    "MLRD": "Malla Reddy",
+    "MREC": "Malla Reddy",
+    "MREM": "Malla Reddy",
+    "MRCW": "Malla Reddy",
+    "MRET": "Malla Reddy",
+    "MLTM": "Malla Reddy",
+    "JNTM": "JNTUH University",
+    "JNTHMT": "JNTUH University",
+    "JNTH": "JNTUH University",
+    "JNKR": "JNTUH University",
+    "JNTR": "JNTUH University",
+    "JNTS": "JNTUH University",
+    "JNWN": "JNTUH University",
+    "CMRK": "CMR Group",
+    "CMRN": "CMR Group",
+    "CMRM": "CMR Group",
+    "CMRG": "CMR Group",
+    "SMCD": "St. Marys",
+    "SMED": "St. Marys",
+    "SMIC": "St. Marys",
+    "DRKC": "DRK Group",
+    "DRKI": "DRK Group",
+    "GNIT": "Guru Nanak",
+    "GURU": "Guru Nanak",
+    "KITS": "Kakatiya",
+    "KITW": "Kakatiya",
+    "KMEC": "Keshav Memorial",
+    "KMIT": "Keshav Memorial",
+    "SCET": "Shadhan",
+    "SWET": "Shadhan",
+    "CHTN": "Sree Chaitanya",
+    "CHTS": "Sree Chaitanya",
+    "INDU": "Sri Indu",
+    "INDI": "Sri Indu",
+    "TCEK": "Trinity",
+    "TCTK": "Trinity",
+    "VAGE": "Vaagdevi",
+    "VGWL": "Vaagdevi",
+    "ANRH": "Anurag",
+    "ANRK": "Anurag",
+    "CVSR": "Anurag",
+    "AURG": "Aurora",
+    "AURP": "Aurora",
+    "AURH": "Aurora",
+    "ELEN": "Ellenki",
+    "ELET": "Ellenki",
+    "AVIH": "Avanthi",
+    "ASRA": "Avanthi",
+    "SIEI": "Siddhartha",
+    "SISG": "Siddhartha",
+    "VBIT": "Vignan",
+    "VGNT": "Vignan",
+    "VBEC": "Vignan"
+  },
+  "groupMap": {
+    "Malla Reddy": [
+      {
+        "code": "MRCE",
+        "name": "MALLA REDDY COLLEGE OF ENGINEERING"
+      },
+      {
+        "code": "MREW",
+        "name": "MALLA REDDY COLLEGE OF ENGINEERING FOR WOMEN"
+      },
+      {
+        "code": "MLRD",
+        "name": "MALLA REDDY COLLEGE OF ENGINEERING TECHNOLOGY"
+      },
+      {
+        "code": "MREC",
+        "name": "MALLA REDDY ENGINEERING COLLEGE"
+      },
+      {
+        "code": "MREM",
+        "name": "MALLA REDDY ENGINEERING COLLEGE AND MANAGEMENT SCIENCES"
+      },
+      {
+        "code": "MRCW",
+        "name": "MALLA REDDY ENGINEERING COLLEGE FOR WOMEN"
+      },
+      {
+        "code": "MRET",
+        "name": "MALLA REDDY INSTITUTE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "MLTM",
+        "name": "MALLA REDDY INSTITUTE OF TECHNOLOGY"
+      }
+    ],
+    "JNTUH University": [
+      {
+        "code": "JNTM",
+        "name": "JNTUH UNIVERSITY COLLEGE OF ENGINEERING  MANTHANI"
+      },
+      {
+        "code": "JNTHMT",
+        "name": "JNTUH UNIVERSITY COLLEGE OF ENGINEERING -5 YEAR INTEGRATED MTECH SELF FINANCE"
+      },
+      {
+        "code": "JNTH",
+        "name": "JNTUH UNIVERSITY COLLEGE OF ENGINEERING HYDERABAD"
+      },
+      {
+        "code": "JNKR",
+        "name": "JNTUH UNIVERSITY COLLEGE OF ENGINEERING JAGTIAL"
+      },
+      {
+        "code": "JNTR",
+        "name": "JNTUH UNIVERSITY COLLEGE OF ENGINEERING RAJANNA SIRICILLA"
+      },
+      {
+        "code": "JNTS",
+        "name": "JNTUH UNIVERSITY COLLEGE OF ENGINEERING SULTANPUR"
+      },
+      {
+        "code": "JNWN",
+        "name": "JNTUH UNIVERSITY COLLEGE OF ENGINEERING WANAPARTHY"
+      }
+    ],
+    "CMR Group": [
+      {
+        "code": "CMRK",
+        "name": "CMR COLLEGE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "CMRN",
+        "name": "CMR ENGINEERING COLLEGE"
+      },
+      {
+        "code": "CMRM",
+        "name": "CMR INSTITUTE OF TECHNOLOGY"
+      },
+      {
+        "code": "CMRG",
+        "name": "CMR TECHNICAL CAMPUS"
+      }
+    ],
+    "St. Marys": [
+      {
+        "code": "SMCD",
+        "name": "ST MARYS ENGINEERING COLLEGE"
+      },
+      {
+        "code": "SMED",
+        "name": "ST MARYS GROUP OF INSTITUTIONS"
+      },
+      {
+        "code": "SMIC",
+        "name": "ST MARYS INTEGRATED CAMPUS"
+      }
+    ],
+    "DRK Group": [
+      {
+        "code": "DRKC",
+        "name": "D R K COLLEGE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "DRKI",
+        "name": "D R K INSTITUTE OF SCIENCE AND TECHNOLOGY"
+      }
+    ],
+    "Guru Nanak": [
+      {
+        "code": "GNIT",
+        "name": "GURU NANAK INSTITUTE OF TECHNOLOGY"
+      },
+      {
+        "code": "GURU",
+        "name": "GURU NANAK INSTITUTIONS TECHNICAL CAMPUS"
+      }
+    ],
+    "Kakatiya": [
+      {
+        "code": "KITS",
+        "name": "KAKATIYA INSTITUTE OF TECHNOLOGY AND SCIENCE"
+      },
+      {
+        "code": "KITW",
+        "name": "KAKATIYA INSTITUTE OF TECHNOLOGY SCIENCE FOR WOMEN"
+      }
+    ],
+    "Keshav Memorial": [
+      {
+        "code": "KMEC",
+        "name": "KESHAV MEMORIAL ENGINEERING COLLEGE"
+      },
+      {
+        "code": "KMIT",
+        "name": "KESHAV MEMORIAL INSTITUTE OF TECHNOLOGY"
+      }
+    ],
+    "Shadhan": [
+      {
+        "code": "SCET",
+        "name": "SHADHAN COLLEGE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "SWET",
+        "name": "SHADHAN WOMENS COLLEGE OF ENGINEERING AND TECHNOLOGY"
+      }
+    ],
+    "Sree Chaitanya": [
+      {
+        "code": "CHTN",
+        "name": "SREE CHAITANYA COLLEGE OF ENGINEERING"
+      },
+      {
+        "code": "CHTS",
+        "name": "SREE CHAITANYA INSTITUTE OF TECHNOLOGY SCIENCES"
+      }
+    ],
+    "Sri Indu": [
+      {
+        "code": "INDU",
+        "name": "SRI INDU COLLEGE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "INDI",
+        "name": "SRI INDU INSTITUTE OF ENGINEERING AND TECHNOLOGY"
+      }
+    ],
+    "Trinity": [
+      {
+        "code": "TCEK",
+        "name": "TRINITY COLLEGE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "TCTK",
+        "name": "TRINITY COLLEGE OF ENGINEERING AND TECHNOLOGY"
+      }
+    ],
+    "Vaagdevi": [
+      {
+        "code": "VAGE",
+        "name": "VAAGDEVI COLLEGE OF ENGINEERING"
+      },
+      {
+        "code": "VGWL",
+        "name": "VAAGDEVI ENGINEERING COLLEGE"
+      }
+    ],
+    "Anurag": [
+      {
+        "code": "ANRH",
+        "name": "ANURAG COLLEGE OF ENGINEERING"
+      },
+      {
+        "code": "ANRK",
+        "name": "ANURAG ENGINEERING COLLGE"
+      },
+      {
+        "code": "CVSR",
+        "name": "ANURAG UNIVERSITY (formerly ANURAG GROUP OF INSTITUTIONS)"
+      }
+    ],
+    "Aurora": [
+      {
+        "code": "AURG",
+        "name": "\"AURORAS TECHNOLOGICAL"
+      },
+      {
+        "code": "AURP",
+        "name": "AURORAS TECHNOLOGICAL AND  RESEARCH INSTITUTE"
+      },
+      {
+        "code": "AURH",
+        "name": "Ramappa Engineering College"
+      }
+    ],
+    "Ellenki": [
+      {
+        "code": "ELEN",
+        "name": "ELLENKI COLLGE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "ELET",
+        "name": "ELLENKI INSTITUTE OF ENGINEERING AND TECHNOLOGY"
+      }
+    ],
+    "Avanthi": [
+      {
+        "code": "AVIH",
+        "name": "AVANTHI INSTITUTE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "ASRA",
+        "name": "AVANTHIS SCIENTIFIC TECHNOLOGY AND RESEARCH ACADEMY"
+      }
+    ],
+    "Siddhartha": [
+      {
+        "code": "SIEI",
+        "name": "SIDDHARTHA INSTITUTE OF ENGINEERING AND TECHNOLOGY"
+      },
+      {
+        "code": "SISG",
+        "name": "SIDDHARTHA INSTITUTE OF TECHNOLOGY AND SCIENCES"
+      }
+    ],
+    "Vignan": [
+      {
+        "code": "VBIT",
+        "name": "VIGNAN BHARATI INSTITUTE OF TECHNOLOGY"
+      },
+      {
+        "code": "VGNT",
+        "name": "VIGNAN INSTITUTE OF TECHNOLOGY AND SCIENCE"
+      },
+      {
+        "code": "VBEC",
+        "name": "VIGNANA BHARATHI ENGINEERING COLLEGE"
+      }
+    ]
+  }
+}
