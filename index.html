@@ -2408,20 +2408,17 @@ Critical Guidelines:
 1. Identify yourself ONLY as Aysh AI. Never refer to yourself as OpenRouter, Llama, Gemini, or any other underlying model.
 2. Provide detailed, comprehensive, and larger responses with rich advice, analysis, explanation of ranks, and details on colleges to give maximum value. Make your responses longer and highly informative.
 3. For tabular data, use standard Markdown tables (using | columns).
-4. Do NOT output any inline map buttons (no `<button onclick="window.highlightBranchOnMap...">` elements).
-5. For Google Maps links in location queries, you MUST use the exact HTML anchor tags with the actual URLs provided in the context. Never use placeholder links or example.com. For other queries, if you want to provide a Google Maps search link, use: `<a href="https://www.google.com/maps/search/?api=1&query=COLLEGE_NAME+COLLEGE_ADDRESS" target="_blank" rel="noopener" style="display:inline-block;padding:4px 10px;background:#16a34a;color:#fff;border-radius:5px;text-decoration:none;font-size:10px;font-weight:700;white-space:nowrap;">🗺️ Google Maps</a>` substituting the college's name and address.`;
+4. Do NOT output any inline map buttons like <button onclick="window.highlightBranchOnMap..."> elements.
+5. For Google Maps links in location queries, you MUST use the exact HTML anchor tags with the actual URLs provided in the context. Never use placeholder links or example.com. For other queries, if you want to provide a Google Maps search link, use the exact anchor format shown by the app, substituting the college's name and address.
+`;
 
   aiChatHistoryData.push({ role: 'user', content: message });
   
   try {
-    const openRouterApiKey = '';
-    const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const apiResponse = await fetch('/api/chat', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        ...(openRouterApiKey ? { 'Authorization': `Bearer ${openRouterApiKey}` } : {}),
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Aysh AI Counselor'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'openrouter/free',
@@ -2431,13 +2428,14 @@ Critical Guidelines:
         ]
       })
     });
-    
-    if (!apiResponse.ok) {
-      throw new Error(`API error: ${apiResponse.status} ${apiResponse.statusText}`);
-    }
-    
+
     const responseJson = await apiResponse.json();
-    const aiResponseText = responseJson.choices[0].message.content;
+
+    if (!apiResponse.ok) {
+      throw new Error(responseJson.error || `API error: ${apiResponse.status} ${apiResponse.statusText}`);
+    }
+
+    const aiResponseText = responseJson.content;
     
     aiChatHistoryData.push({ role: 'assistant', content: aiResponseText });
     addAiChatBubble('ai', aiResponseText);
