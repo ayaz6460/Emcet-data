@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, model = 'openrouter/free' } = req.body || {};
+    const { messages, model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini', max_tokens = 450 } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages must be a non-empty array' });
@@ -26,7 +26,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        messages
+        messages,
+        max_tokens
       })
     });
 
